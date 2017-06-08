@@ -260,8 +260,10 @@ paket-files/
 __pycache__/
 *.pyc
 
-#Unity3D
+# Unity3D
 obj/
 Library/
 ProjectSettings/
 Temp/
+*.csproj
+*.sln
