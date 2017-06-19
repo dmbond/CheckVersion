@@ -76,6 +76,11 @@ public class HelpLastRelease : EditorWindow {
         Application.OpenURL(betaArchiveUrl);
     }
 
+    [MenuItem("Help/Links/Patch Archive...")]
+    static void OpenPatchArchive() {
+        Application.OpenURL(patchRN);
+    }
+
     [MenuItem("Help/Links/Report...")]
     static void OpenReport() {
         Application.OpenURL(reportUrl);
