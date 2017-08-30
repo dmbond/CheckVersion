@@ -44,11 +44,11 @@ public class HelpLastRelease : EditorWindow {
 	const float minWidth = 160f;
 	static Vector2 scroll;
 	static Dictionary<string, Color> colors = new Dictionary<string, Color>() {
-		{ "5.4.", Color.black },
-		{ "5.5.", Color.cyan },
-		{ "5.6.", Color.green },
-		{ "2017.1.", Color.yellow },
-		{ "2017.2.", Color.red }
+		{ "5.5.", Color.magenta },
+		{ "5.6.", Color.cyan },
+		{ "2017.1.", Color.green },
+		{ "2017.2.", Color.yellow },
+		{ "2017.3.", Color.red }
 	};
 
 	[MenuItem("Help/Links/Statistics...")]
@@ -137,10 +137,14 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void ColorGUI(int i) {
-		GUI.contentColor = Color.white;
 		foreach (var k in colors.Keys) {
+			GUI.contentColor = Color.white;
+			GUI.backgroundColor = Color.white;
 			if (currentList.Values[i].Contains(k)) {
-				GUI.contentColor = colors[k];
+				if (EditorGUIUtility.isProSkin)
+					GUI.contentColor = colors[k];
+				else
+					GUI.backgroundColor = colors[k];
 				break;
 			}
 		}
@@ -156,6 +160,7 @@ public class HelpLastRelease : EditorWindow {
 		if (count > 0 && fullList.Count > count) {
 			EditorApplication.Beep();
 			Debug.LogFormat("New version: <color=yellow>{0}</color>", fullList.Values[fullList.Count - 1]);
+			currentList = null;
 		}
 		EditorPrefs.SetInt(prefsCount, fullList.Count);
 	}
