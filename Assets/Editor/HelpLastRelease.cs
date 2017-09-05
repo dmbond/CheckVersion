@@ -8,41 +8,54 @@ using UnityEditor;
 using Debug = UnityEngine.Debug;
 
 public class HelpLastRelease : EditorWindow {
+
 	const string statsUrl = @"http://hwstats.unity3d.com/index.html";
 	const string experimenalUrl = @"http://unity3d.com/experimental";
 	const string roadmapUrl = @"http://unity3d.com/unity/roadmap";
+
 	const string archiveUrl = @"http://unity3d.com/get-unity/download/archive";
 	const string betaArchiveUrl = @"http://unity3d.com/unity/beta/archive";
-	const string reportUrl = @"http://files.unity3d.com/build-report/";
 	const string releaseUrl = @"http://beta.unity3d.com/download/{0}/download.html";
+
+	const string searchUrl = @"http://unity3d.com/search";
+	const string searchGitHubUrl = @"http://unitylist.com";
+
 	const string assistantUrl = @"http://beta.unity3d.com/download/{0}/UnityDownloadAssistant-{1}.{2}";
 	const string serverUrl = @"http://symbolserver.unity3d.com/";
 	const string historyUrl = serverUrl + @"000Admin/history.txt";
-	const string searchUrl = @"http://unity3d.com/search";
-	const string searchGitHubUrl = @"http://unitylist.com";
+
 	const string finalRN = @"http://unity3d.com/unity/whats-new/unity-";
 	const string betaRN = @"http://unity3d.com/unity/beta/unity";
 	const string patchRN = @"http://unity3d.com/unity/qa/patch-releases/";
 
+	static readonly string zipName = Application.platform == RuntimePlatform.WindowsEditor ? "7z" : "7za";
 	const string baseName = "UnityYAMLMerge.ex";
 	const string compressedName = baseName + "_";
 	const string extractedName = baseName + "e";
 	static string tempDir;
+
 	static WWW wwwHistory, wwwList, wwwMerger, wwwAssistant;
-	static readonly string zipName = Application.platform == RuntimePlatform.WindowsEditor ? "7z" : "7za";
 
 	static SortedList<string, string> fullList;
 	static SortedList<string, string> sortedList;
 	static SortedList<string, string> currentList;
-	static int selected;
-	static bool assistant;
+
+	static int idxSelectedInCurrent;
+	static bool isAssistant;
+
 	static HelpLastRelease window;
 	const string wndTitle = "Unity Builds";
-	static string search = "";
-	static GUIStyle btnStyle;
 	const string prefsCount = "HelpLastRelease.count";
+
+	static string filterString = "";
+	static GUIStyle btnStyle;
 	const float minWidth = 160f;
-	static Vector2 scroll;
+	static Vector2 scrollPos;
+
+	static readonly string rnTooltip = "Open Release Notes";
+	static readonly string assistTooltip = "Open Download Assistant";
+	static readonly string versionTooltip = "Open Download Page";
+
 	static Dictionary<string, Color> colors = new Dictionary<string, Color>() {
 		{ "5.5.", Color.magenta },
 		{ "5.6.", Color.cyan },
@@ -50,56 +63,60 @@ public class HelpLastRelease : EditorWindow {
 		{ "2017.2.", Color.yellow },
 		{ "2017.3.", Color.red }
 	};
+	static float alphaBackForPersonal = 0.3f;
 
-	[MenuItem("Help/Links/Statistics...")]
-	static void OpenStatistics() {
-		Application.OpenURL(statsUrl);
+	#region Menu
+
+	[MenuItem("Help/Links/Last Release...", false, 900)]
+	static void Init() {
+		window = GetWindow<HelpLastRelease>(wndTitle);
 	}
+	// ---
 
-	[MenuItem("Help/Links/Experimental...")]
-	static void OpenExperimental() {
-		Application.OpenURL(experimenalUrl);
-	}
-
-	[MenuItem("Help/Links/Roadmap...")]
-	static void OpenRoadmap() {
-		Application.OpenURL(roadmapUrl);
-	}
-
-	[MenuItem("Help/Links/Archive...")]
-	static void OpenArchive() {
-		Application.OpenURL(archiveUrl);
-	}
-
-	[MenuItem("Help/Links/Beta Archive...")]
-	static void OpenBetaArchive() {
-		Application.OpenURL(betaArchiveUrl);
-	}
-
-	[MenuItem("Help/Links/Patch Archive...")]
-	static void OpenPatchArchive() {
-		Application.OpenURL(patchRN);
-	}
-
-	[MenuItem("Help/Links/Report...")]
-	static void OpenReport() {
-		Application.OpenURL(reportUrl);
-	}
-
-	[MenuItem("Help/Links/Search...")]
+	[MenuItem("Help/Links/Search...", false, 920)]
 	static void OpenSearch() {
 		Application.OpenURL(searchUrl);
 	}
 
-	[MenuItem("Help/Links/Search GitHub...")]
+	[MenuItem("Help/Links/Search GitHub...", false, 925)]
 	static void OpenAwesome() {
 		Application.OpenURL(searchGitHubUrl);
 	}
+	// ---
 
-	[MenuItem("Help/Links/Last Release...")]
-	static void Init() {
-		window = GetWindow<HelpLastRelease>(wndTitle);
+	[MenuItem("Help/Links/Archive...", false, 940)]
+	static void OpenArchive() {
+		Application.OpenURL(archiveUrl);
 	}
+
+	[MenuItem("Help/Links/Beta Archive...", false, 945)]
+	static void OpenBetaArchive() {
+		Application.OpenURL(betaArchiveUrl);
+	}
+
+	[MenuItem("Help/Links/Patch Archive...", false, 948)]
+	static void OpenPatchArchive() {
+		Application.OpenURL(patchRN);
+	}
+	// ---
+
+	[MenuItem("Help/Links/Roadmap...", false, 960)]
+	static void OpenRoadmap() {
+		Application.OpenURL(roadmapUrl);
+	}
+
+	[MenuItem("Help/Links/Experimental...", false, 965)]
+	static void OpenExperimental() {
+		Application.OpenURL(experimenalUrl);
+	}
+
+	[MenuItem("Help/Links/Statistics...", false, 970)]
+	static void OpenStatistics() {
+		Application.OpenURL(statsUrl);
+	}
+	// ---
+
+	#endregion
 
 	void OnGUI() {
 		if (fullList != null) {
@@ -111,18 +128,18 @@ public class HelpLastRelease : EditorWindow {
 		btnStyle = new GUIStyle(EditorStyles.miniButton);
 		btnStyle.alignment = TextAnchor.MiddleLeft;
 		SearchGUI();
-		scroll = EditorGUILayout.BeginScrollView(scroll, false, false);
+		scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false);
 		if (currentList == null) currentList = fullList;
 		for (int i = currentList.Count - 1; i >= 0; i--) {
 			GUILayout.BeginHorizontal();
 			ColorGUI(i);
-			if (GUILayout.Button("RN", btnStyle)) {
+			if (GUILayout.Button(new GUIContent("RN", rnTooltip), btnStyle)) {
 				OpenReleaseNotes(i);
 			}
-			if (GUILayout.Button("A", btnStyle)) {
+			if (GUILayout.Button(new GUIContent("A", assistTooltip), btnStyle)) {
 				DownloadList(i, true);
 			}
-			if (GUILayout.Button(currentList.Values[i], btnStyle, GUILayout.MinWidth(minWidth))) {
+			if (GUILayout.Button(new GUIContent(currentList.Values[i], versionTooltip), btnStyle, GUILayout.MinWidth(minWidth))) {
 				DownloadList(i);
 			}
 			GUILayout.FlexibleSpace();
@@ -137,20 +154,20 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void ColorGUI(int i) {
+		Color alpha = new Color(1f, 1f, 1f, alphaBackForPersonal);
 		foreach (var k in colors.Keys) {
-			GUI.contentColor = Color.white;
-			GUI.backgroundColor = Color.white;
-			if (currentList.Values[i].Contains(k)) {
-				if (EditorGUIUtility.isProSkin)
-					GUI.contentColor = colors[k];
-				else
-					GUI.backgroundColor = colors[k];
-				break;
+			bool isColored = currentList.Values[i].Contains(k);
+			if (EditorGUIUtility.isProSkin) {
+				GUI.contentColor = isColored ? colors[k] : Color.white;
+			} else {
+				GUI.backgroundColor = isColored ? colors[k] * alpha : Color.white * alpha;
 			}
+			if (isColored) break;
 		}
 	}
 
 	void OnEnable() {
+		// get_dataPath is not allowed to be called from a ScriptableObject constructor
 		tempDir = Application.dataPath + "/../Temp/LastRelease";
 		DownloadHistory();
 	}
@@ -159,7 +176,8 @@ public class HelpLastRelease : EditorWindow {
 		int count = EditorPrefs.GetInt(prefsCount, 0);
 		if (count > 0 && fullList.Count > count) {
 			EditorApplication.Beep();
-			Debug.LogFormat("New version: <color=yellow>{0}</color>", fullList.Values[fullList.Count - 1]);
+			string color = EditorGUIUtility.isProSkin ? "yellow" : "red";
+			Debug.LogFormat("New version: <color={0}>{1}</color>", color, fullList.Values[fullList.Count - 1]);
 			currentList = null;
 		}
 		EditorPrefs.SetInt(prefsCount, fullList.Count);
@@ -167,7 +185,11 @@ public class HelpLastRelease : EditorWindow {
 
 	static void OpenReleaseNotes(int num) {
 		string url = "", version = "";
-		if (currentList.Values[num].Contains("a")) return;
+		if (currentList.Values[num].Contains("a")) {
+			Debug.LogWarningFormat("Release Notes for alpha version {0} are not available", currentList.Values[num]);
+			EditorApplication.Beep();
+			return;
+		}
 		if (currentList.Values[num].Contains("p")) {
 			version = currentList.Values[num].Split(' ')[0];
 			url = patchRN + version;
@@ -208,12 +230,12 @@ public class HelpLastRelease : EditorWindow {
 			string[] lines;
 			lines = File.ReadAllLines(path, Encoding.Unicode);
 			FileUtil.DeleteFileOrDirectory(Path.GetDirectoryName(path));
-			string version = currentList.Values[selected].Split(' ')[0] + "_";
+			string version = currentList.Values[idxSelectedInCurrent].Split(' ')[0] + "_";
 			for (int i = 0; i < lines.Length; i++) {
 				if (lines[i].Contains(version)) {
 					int pos = lines[i].IndexOf(version);
 					string revision = lines[i].Substring(pos + version.Length, 12);
-					if (!assistant) {
+					if (!isAssistant) {
 						Application.OpenURL(string.Format(releaseUrl, revision));
 					} else {
 						DownloadAssistant(revision);
@@ -225,7 +247,7 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void DownloadAssistant(string revision) {
-		string version = currentList.Values[selected].Split(' ')[0];
+		string version = currentList.Values[idxSelectedInCurrent].Split(' ')[0];
 		string ext = Application.platform == RuntimePlatform.WindowsEditor ? "exe" : "dmg";
 		string url = string.Format(assistantUrl, revision, version, ext);
 		wwwAssistant = new WWW(url);
@@ -238,8 +260,8 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void DownloadList(int historyNum, bool assist = false) {
-		selected = historyNum;
-		assistant = assist;
+		idxSelectedInCurrent = historyNum;
+		isAssistant = assist;
 		string listUrl = string.Format("{0}000Admin/{1}", serverUrl, currentList.Keys[historyNum]);
 		wwwList = new WWW(listUrl);
 		EditorApplication.update += WaitList;
@@ -291,7 +313,7 @@ public class HelpLastRelease : EditorWindow {
 	static void Wait(WWW www, EditorApplication.CallbackFunction caller, Action<WWW> action, Action done = null) {
 		if (www != null && www.isDone) {
 			EditorApplication.update -= caller;
-			if (string.IsNullOrEmpty(www.error) && www.size > 0) {
+			if (string.IsNullOrEmpty(www.error) && www.bytesDownloaded > 0) {
 				//Debug.LogFormat("{0} kB: {1}", www.size/1024, www.url);
 				if (action != null) action(www);
 				if (done != null) done();
@@ -329,7 +351,6 @@ public class HelpLastRelease : EditorWindow {
 			Directory.CreateDirectory(tempDir);
 		}
 		string path = Path.Combine(tempDir, compressedName);
-		//Debug.LogFormat("path: {0}", path);
 		File.WriteAllBytes(path, merger.bytes);
 		ExtractMerger(path);
 	}
@@ -356,18 +377,18 @@ public class HelpLastRelease : EditorWindow {
 	static void SearchGUI() {
 		string s = string.Empty;
 		GUILayout.BeginHorizontal(GUI.skin.FindStyle("Toolbar"));
-		s = GUILayout.TextField(search, GUI.skin.FindStyle("ToolbarSeachTextField"));
+		s = GUILayout.TextField(filterString, GUI.skin.FindStyle("ToolbarSeachTextField"));
 		if (GUILayout.Button("", GUI.skin.FindStyle("ToolbarSeachCancelButton"))) {
 			s = "";
 			GUI.FocusControl(null);
 		}
 		GUILayout.EndHorizontal();
-		if (s != search) {
-			search = s;
-			if (!string.IsNullOrEmpty(search)) {
+		if (s != filterString) {
+			filterString = s;
+			if (!string.IsNullOrEmpty(filterString)) {
 				sortedList = new SortedList<string, string>();
 				for (int i = fullList.Count - 1; i >= 0; i--) {
-					if (fullList.Values[i].Contains(search)) {
+					if (fullList.Values[i].Contains(filterString)) {
 						sortedList.Add(fullList.Keys[i], fullList.Values[i]);
 					}
 				}
