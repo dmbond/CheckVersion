@@ -45,16 +45,17 @@ public class HelpLastRelease : EditorWindow {
 
 	static HelpLastRelease window;
 	const string wndTitle = "Unity Builds";
-	const string prefsCount = "HelpLastRelease.count";
+	const string prefs = "HelpLastRelease.";
+	const string prefsCount = prefs + "count";
 
 	static string filterString = "";
 	static GUIStyle btnStyle;
 	const float minWidth = 160f;
 	static Vector2 scrollPos;
 
-	static readonly string rnTooltip = "Open Release Notes";
-	static readonly string assistTooltip = "Open Download Assistant";
-	static readonly string versionTooltip = "Open Download Page";
+	const string rnTooltip = "Open Release Notes";
+	const string assistTooltip = "Open Download Assistant";
+	const string versionTooltip = "Open Download Page";
 
 	static Dictionary<string, Color> colors = new Dictionary<string, Color>() {
 		{ "5.5.", Color.magenta },
@@ -172,17 +173,6 @@ public class HelpLastRelease : EditorWindow {
 		DownloadHistory();
 	}
 
-	static void CheckNewVersion() {
-		int count = EditorPrefs.GetInt(prefsCount, 0);
-		if (count > 0 && fullList.Count > count) {
-			EditorApplication.Beep();
-			string color = EditorGUIUtility.isProSkin ? "yellow" : "red";
-			Debug.LogFormat("New version: <color={0}>{1}</color>", color, fullList.Values[fullList.Count - 1]);
-			currentList = null;
-		}
-		EditorPrefs.SetInt(prefsCount, fullList.Count);
-	}
-
 	static void OpenReleaseNotes(int num) {
 		string url = "", version = "";
 		if (currentList.Values[num].Contains("a")) {
@@ -208,6 +198,7 @@ public class HelpLastRelease : EditorWindow {
 	static void FillMenu(WWW history) {
 		fullList = new SortedList<string, string>();
 		string build;
+		//0000000001,add,file,02/03/2015,13:13:44,"Unity","5.0.0b22","",
 		string[] parts, releases = history.text.Split('\n');
 		for (int i = 0; i < releases.Length; i++) {
 			parts = releases[i].Split(',');
@@ -217,11 +208,24 @@ public class HelpLastRelease : EditorWindow {
 				fullList.Add(parts[0], build);
 			}
 		}
+		CheckNewVersion();
 		if (window == null) {
 			HelpLastRelease[] w = Resources.FindObjectsOfTypeAll<HelpLastRelease>();
 			if (w != null && w.Length > 0) window = w[0];
 		}
 		if (window != null) window.Repaint();
+	}
+
+	static void CheckNewVersion() {
+		int count = EditorPrefs.GetInt(prefsCount, 0);
+		if (fullList.Count > count) {
+			EditorApplication.Beep();
+			string color = EditorGUIUtility.isProSkin ? "yellow" : "red";
+			Debug.LogFormat("New version: <color={0}>{1}</color>", color,
+				fullList.Values[fullList.Count - 1]);
+			EditorPrefs.SetInt(prefsCount, fullList.Count);
+			currentList = null;
+		}
 	}
 
 	static void SearchVersion() {
@@ -235,14 +239,19 @@ public class HelpLastRelease : EditorWindow {
 				if (lines[i].Contains(version)) {
 					int pos = lines[i].IndexOf(version);
 					string revision = lines[i].Substring(pos + version.Length, 12);
-					if (!isAssistant) {
-						Application.OpenURL(string.Format(releaseUrl, revision));
-					} else {
-						DownloadAssistant(revision);
-					}
+					DoWithRevision(revision);
+					EditorPrefs.SetString(prefs + currentList.Keys[idxSelectedInCurrent], revision);
 					break;
 				}
 			}
+		}
+	}
+
+	private static void DoWithRevision(string revision) {
+		if (!isAssistant) {
+			Application.OpenURL(string.Format(releaseUrl, revision));
+		} else {
+			DownloadAssistant(revision);
 		}
 	}
 
@@ -262,9 +271,14 @@ public class HelpLastRelease : EditorWindow {
 	static void DownloadList(int historyNum, bool assist = false) {
 		idxSelectedInCurrent = historyNum;
 		isAssistant = assist;
-		string listUrl = string.Format("{0}000Admin/{1}", serverUrl, currentList.Keys[historyNum]);
-		wwwList = new WWW(listUrl);
-		EditorApplication.update += WaitList;
+		string revision = EditorPrefs.GetString(prefs + currentList.Keys[idxSelectedInCurrent], "");
+		if (!string.IsNullOrEmpty(revision)) {
+			DoWithRevision(revision);
+		} else {
+			string listUrl = string.Format("{0}000Admin/{1}", serverUrl, currentList.Keys[historyNum]);
+			wwwList = new WWW(listUrl);
+			EditorApplication.update += WaitList;
+		}
 	}
 
 	static void WaitList() {
@@ -272,7 +286,7 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void WaitHistory() {
-		Wait(wwwHistory, WaitHistory, FillMenu, CheckNewVersion);
+		Wait(wwwHistory, WaitHistory, FillMenu);
 	}
 
 	static void WaitAssistant() {
@@ -310,13 +324,12 @@ public class HelpLastRelease : EditorWindow {
 		}
 	}
 
-	static void Wait(WWW www, EditorApplication.CallbackFunction caller, Action<WWW> action, Action done = null) {
+	static void Wait(WWW www, EditorApplication.CallbackFunction caller, Action<WWW> action) {
 		if (www != null && www.isDone) {
 			EditorApplication.update -= caller;
 			if (string.IsNullOrEmpty(www.error) && www.bytesDownloaded > 0) {
 				//Debug.LogFormat("{0} kB: {1}", www.size/1024, www.url);
 				if (action != null) action(www);
-				if (done != null) done();
 			} else Debug.LogWarningFormat("{0} {1}", www.url, www.error);
 			www = null;
 		} else {
