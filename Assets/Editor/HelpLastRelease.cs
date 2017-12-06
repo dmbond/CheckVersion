@@ -59,10 +59,11 @@ public class HelpLastRelease : EditorWindow {
 
 	static Dictionary<string, Color> colors = new Dictionary<string, Color>() {
 		{ "5.5.", Color.magenta },
-		{ "5.6.", Color.cyan },
-		{ "2017.1.", Color.green },
-		{ "2017.2.", Color.yellow },
-		{ "2017.3.", Color.red }
+		{ "5.6.", Color.blue },
+		{ "2017.1.", Color.cyan },
+		{ "2017.2.", Color.green },
+		{ "2017.3.", Color.yellow },
+		{ "2018.1.", Color.red }
 	};
 	static float alphaBackForPersonal = 0.3f;
 
