@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using UnityEngine;
 using UnityEditor;
@@ -28,6 +29,8 @@ public class HelpLastRelease : EditorWindow {
 	const string betaRN = @"http://unity3d.com/unity/beta/unity";
 	const string patchRN = @"http://unity3d.com/unity/qa/patch-releases/";
 
+	const string githubUrl = @"http://api.github.com/repos/dmbond/CheckVersion/releases/latest";
+
 	static readonly string zipName = Application.platform == RuntimePlatform.WindowsEditor ? "7z" : "7za";
 	const string baseName = "UnityYAMLMerge.ex";
 	const string compressedName = baseName + "_";
@@ -35,6 +38,7 @@ public class HelpLastRelease : EditorWindow {
 	static string tempDir;
 
 	static WWW wwwHistory, wwwList, wwwMerger, wwwAssistant;
+	static WWW wwwGithub, wwwPackage;
 
 	static SortedList<string, string> fullList;
 	static SortedList<string, string> sortedList;
@@ -45,8 +49,12 @@ public class HelpLastRelease : EditorWindow {
 
 	static HelpLastRelease window;
 	const string wndTitle = "Unity Builds";
-	const string prefs = "HelpLastRelease.";
+	const string scriptName = "HelpLastRelease";
+	const string prefs = scriptName + ".";
 	const string prefsCount = prefs + "count";
+	static string githubDTString;
+	// if you do not need autoupdate script from Github set to false
+	static bool autoUpdate = true;
 
 	static string filterString = "";
 	static GUIStyle btnStyle;
@@ -118,6 +126,15 @@ public class HelpLastRelease : EditorWindow {
 	}
 	// ---
 
+	[MenuItem("Help/Links/Update", false, 990)]
+	static void UpdateFromGithub() {
+		if (Application.internetReachability == NetworkReachability.NotReachable) {
+			Debug.LogWarningFormat("Can't update {0} from Github, network is not reachable", scriptName);
+		} else {
+			DownloadGithub();
+		}
+	}
+
 	#endregion
 
 	void OnGUI() {
@@ -169,9 +186,23 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	void OnEnable() {
-		// get_dataPath is not allowed to be called from a ScriptableObject constructor
-		tempDir = Application.dataPath + "/../Temp/LastRelease";
+		tempDir = SetTempDir();
 		DownloadHistory();
+	}
+
+	[InitializeOnLoadMethod]
+	static void AutoUpdate() {
+		if (autoUpdate && Application.internetReachability != NetworkReachability.NotReachable) {
+			DownloadGithub();
+		}
+	}
+
+	static string SetTempDir() {
+		string result = string.Format("{0}/../Temp/{1}", Application.dataPath, scriptName);
+		if (!Directory.Exists(result)) {
+			Directory.CreateDirectory(result);
+		}
+		return result;
 	}
 
 	static void OpenReleaseNotes(int num) {
@@ -388,6 +419,57 @@ public class HelpLastRelease : EditorWindow {
 		}
 	}
 
+	static void DownloadGithub() {
+		wwwGithub = new WWW(githubUrl);
+		EditorApplication.update += WaitGithub;
+	}
+
+	static void WaitGithub() {
+		Wait(wwwGithub, WaitGithub, ParseGithub);
+	}
+
+	static void ParseGithub(WWW github) {
+		string[] splitLines = { ",\"", "{\"" };
+		string[] lines = github.text.Split(splitLines, StringSplitOptions.RemoveEmptyEntries);
+		string[] parts;
+		string[] splitParts = new []{ "\":", "\"}]", "[{\"", "\"}" };
+		githubDTString = null;
+		string download_url = null;
+		for (int i = 0; i < lines.Length; i++) {
+			parts = lines[i].Split(splitParts, StringSplitOptions.RemoveEmptyEntries);
+			if (string.IsNullOrEmpty(githubDTString) && parts[0].Contains("created_at")) {
+				githubDTString = parts[1].Trim('"');
+				string current = EditorPrefs.GetString(prefs + Application.productName, "1970-01-01T00:00:00Z");
+				if (githubDTString == current ||
+					DateTime.Parse(current) > DateTime.Parse(githubDTString))
+						break;
+			}
+			if (string.IsNullOrEmpty(download_url) && parts[0].Contains("browser_download_url")) {
+				download_url = parts[1].Trim('"');
+				DownloadPackage(download_url);
+			}
+		}
+	}
+
+	static void DownloadPackage(string packageUrl) {
+		wwwPackage = new WWW(packageUrl);
+		EditorApplication.update += WaitPackage;
+	}
+
+	static void WaitPackage() {
+		Wait(wwwPackage, WaitPackage, ImportPackage);
+	}
+
+	static void ImportPackage(WWW package) {
+		tempDir = SetTempDir();
+		string name = Path.GetFileName(package.url);
+		string path = Path.Combine(tempDir, name);
+		File.WriteAllBytes(path, package.bytes);
+		AssetDatabase.ImportPackage(path, false);
+		EditorPrefs.SetString(prefs + Application.productName, githubDTString);
+		Debug.LogFormat("{0} updated from Github", scriptName);
+	}
+
 	static void SearchGUI() {
 		string s = string.Empty;
 		GUILayout.BeginHorizontal(GUI.skin.FindStyle("Toolbar"));
@@ -424,4 +506,5 @@ public class HelpLastRelease : EditorWindow {
 		GUILayout.FlexibleSpace();
 		GUILayout.EndHorizontal();
 	}
+
 }
