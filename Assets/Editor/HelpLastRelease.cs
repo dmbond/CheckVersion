@@ -53,6 +53,7 @@ public class HelpLastRelease : EditorWindow {
 	const string prefs = scriptName + ".";
 	const string prefsCount = prefs + "count";
 	static string githubDTString;
+	static string githubPackageUrl;
 	// if you do not need autoupdate script from Github set to false
 	static bool autoUpdate = true;
 
@@ -420,7 +421,9 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void DownloadGithub() {
-		wwwGithub = new WWW(githubUrl);
+		var headers = new Dictionary<string, string>();
+		headers.Add("User-Agent", "libcurl");
+		wwwGithub = new WWW(githubUrl, null, headers);
 		EditorApplication.update += WaitGithub;
 	}
 
@@ -429,24 +432,26 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void ParseGithub(WWW github) {
-		string[] splitLines = { ",\"", "{\"" };
+		var splitLines = new[] {'\n'};
 		string[] lines = github.text.Split(splitLines, StringSplitOptions.RemoveEmptyEntries);
+		var splitParts = new[] {"\": ", ","};
 		string[] parts;
-		string[] splitParts = new []{ "\":", "\"}]", "[{\"", "\"}" };
 		githubDTString = null;
-		string download_url = null;
+		githubPackageUrl = null;
 		for (int i = 0; i < lines.Length; i++) {
-			parts = lines[i].Split(splitParts, StringSplitOptions.RemoveEmptyEntries);
-			if (string.IsNullOrEmpty(githubDTString) && parts[0].Contains("created_at")) {
-				githubDTString = parts[1].Trim('"');
-				string current = EditorPrefs.GetString(prefs + Application.productName, "1970-01-01T00:00:00Z");
-				if (githubDTString == current ||
-					DateTime.Parse(current) > DateTime.Parse(githubDTString))
+			if (lines[i].Contains("\":")) {
+				parts = lines[i].Split(splitParts, StringSplitOptions.RemoveEmptyEntries);
+				if (string.IsNullOrEmpty(githubDTString) && parts[0].Contains("created_at")) {
+					githubDTString = parts[1].Trim('"');
+					string current = EditorPrefs.GetString(prefs + Application.productName, "1970-01-01T00:00:00Z");
+					if (githubDTString == current ||
+					    DateTime.Parse(current) > DateTime.Parse(githubDTString))
 						break;
-			}
-			if (string.IsNullOrEmpty(download_url) && parts[0].Contains("browser_download_url")) {
-				download_url = parts[1].Trim('"');
-				DownloadPackage(download_url);
+				}
+				if (string.IsNullOrEmpty(githubPackageUrl) && parts[0].Contains("browser_download_url")) {
+					githubPackageUrl = parts[1].Trim('"');
+					DownloadPackage(githubPackageUrl);
+				}
 			}
 		}
 	}
@@ -462,7 +467,7 @@ public class HelpLastRelease : EditorWindow {
 
 	static void ImportPackage(WWW package) {
 		tempDir = SetTempDir();
-		string name = Path.GetFileName(package.url);
+		string name = Path.GetFileName(githubPackageUrl);
 		string path = Path.Combine(tempDir, name);
 		File.WriteAllBytes(path, package.bytes);
 		AssetDatabase.ImportPackage(path, false);
