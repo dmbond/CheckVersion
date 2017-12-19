@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using UnityEngine;
@@ -232,11 +233,9 @@ public class HelpLastRelease : EditorWindow {
 		string[] parts, releases = history.text.Split('\n');
 		for (int i = 0; i < releases.Length; i++) {
 			parts = releases[i].Split(',');
-			DateTime dt;
-			if (DateTime.TryParse(string.Format("{0} {1}", parts[3], parts[4]), out dt)) {
-				build = string.Format("{0} ({1})", parts[6].Trim('\"'), dt.ToString("dd-MM-yyyy"));
-				fullList.Add(parts[0], build);
-			}
+			DateTime dt = DateTime.ParseExact(string.Format("{0} {1}", parts[3], parts[4]), "MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+			build = string.Format("{0} ({1})", parts[6].Trim('\"'), dt.ToString("dd-MM-yyyy"));
+			fullList.Add(parts[0], build);
 		}
 		CheckNewVersion();
 		if (window == null) {
