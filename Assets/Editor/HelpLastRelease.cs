@@ -31,6 +31,10 @@ public class HelpLastRelease : EditorWindow {
 
 	const string githubUrl = @"http://api.github.com/repos/dmbond/CheckVersion/releases/latest";
 
+	const string tutorialsUrl = @"http://unity3d.com/learn/tutorials";
+	const string knowledgeBaseUrl = @"http://support.unity3d.com";
+	const string liveTrainingUrl = @"http://unity3d.com/learn/live-training";
+
 	static readonly string zipName = Application.platform == RuntimePlatform.WindowsEditor ? "7z" : "7za";
 	const string baseName = "UnityYAMLMerge.ex";
 	const string compressedName = baseName + "_";
@@ -56,6 +60,10 @@ public class HelpLastRelease : EditorWindow {
 	static bool autoUpdate = true;
 
 	static string filterString = "";
+	static string universalDT = "yyyy-MM-ddTHH:mm:ssZ";
+	static string nullDT = "1970-01-01T00:00:00Z";
+	static string srcDT = "MM/dd/yyyy HH:mm:ss";
+	static string listDT = "dd-MM-yyyy";
 	static GUIStyle btnStyle;
 	const float minWidth = 160f;
 	static Vector2 scrollPos;
@@ -70,68 +78,76 @@ public class HelpLastRelease : EditorWindow {
 		{ "2017.1.", Color.cyan },
 		{ "2017.2.", Color.green },
 		{ "2017.3.", Color.yellow },
-		{ "2018.1.", Color.red }
+		{ "2018.1.", Color.red },
+		{ "2018.2.", Color.red },
+		{ "2018.3.", Color.red }
 	};
 	static float alphaBackForPersonal = 0.3f;
 
 	#region Menu
 
-	[MenuItem("Help/Links/Last Release...", false, 900)]
+	[MenuItem("Help/Links/Last Release...", false, 010)]
 	static void Init() {
 		window = GetWindow<HelpLastRelease>(wndTitle);
 	}
 	// ---
 
-	[MenuItem("Help/Links/Search...", false, 920)]
+	[MenuItem("Help/Links/Search...", false, 100)]
 	static void OpenSearch() {
 		Application.OpenURL(searchUrl);
 	}
 
-	[MenuItem("Help/Links/Search GitHub...", false, 925)]
+	[MenuItem("Help/Links/Search GitHub...", false, 105)]
 	static void OpenAwesome() {
 		Application.OpenURL(searchGitHubUrl);
 	}
-	// ---
+	// ---	
 
-	[MenuItem("Help/Links/Archive...", false, 940)]
+	[MenuItem("Help/Links/Archive...", false, 200)]
 	static void OpenArchive() {
 		Application.OpenURL(archiveUrl);
 	}
 
-	[MenuItem("Help/Links/Beta Archive...", false, 945)]
+	[MenuItem("Help/Links/Beta Archive...", false, 205)]
 	static void OpenBetaArchive() {
 		Application.OpenURL(betaArchiveUrl);
 	}
 
-	[MenuItem("Help/Links/Patch Archive...", false, 948)]
+	[MenuItem("Help/Links/Patch Archive...", false, 210)]
 	static void OpenPatchArchive() {
 		Application.OpenURL(patchRN);
 	}
 	// ---
 
-	[MenuItem("Help/Links/Roadmap...", false, 960)]
+	[MenuItem("Help/Links/Tutorials...", false, 700)]
+	static void OpenBestPractices() {
+		Application.OpenURL(tutorialsUrl);
+	}
+
+	[MenuItem("Help/Links/Knowledge Base...", false, 705)]
+	static void OpenKnowledgeBase() {
+		Application.OpenURL(knowledgeBaseUrl);
+	}
+
+	[MenuItem("Help/Links/Live Training...", false, 710)]
+	static void OpenLiveTraining() {
+		Application.OpenURL(liveTrainingUrl);
+	}
+	// ---
+
+	[MenuItem("Help/Links/Roadmap...", false, 800)]
 	static void OpenRoadmap() {
 		Application.OpenURL(roadmapUrl);
 	}
 
-	[MenuItem("Help/Links/Experimental...", false, 965)]
+	[MenuItem("Help/Links/Experimental...", false, 805)]
 	static void OpenExperimental() {
 		Application.OpenURL(experimenalUrl);
 	}
 
-	[MenuItem("Help/Links/Statistics...", false, 970)]
+	[MenuItem("Help/Links/Statistics...", false, 810)]
 	static void OpenStatistics() {
 		Application.OpenURL(statsUrl);
-	}
-	// ---
-
-	[MenuItem("Help/Links/Update", false, 990)]
-	static void UpdateFromGithub() {
-		if (Application.internetReachability == NetworkReachability.NotReachable) {
-			Debug.LogWarningFormat("Can't update {0} from Github, network is not reachable", scriptName);
-		} else {
-			DownloadGithub();
-		}
 	}
 
 	#endregion
@@ -145,7 +161,7 @@ public class HelpLastRelease : EditorWindow {
 	public static void ListGUI() {
 		btnStyle = new GUIStyle(EditorStyles.miniButton);
 		btnStyle.alignment = TextAnchor.MiddleLeft;
-		SearchGUI();
+		SearchVersionGUI();
 		scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false);
 		if (currentList == null) currentList = fullList;
 		for (int i = currentList.Count - 1; i >= 0; i--) {
@@ -233,8 +249,8 @@ public class HelpLastRelease : EditorWindow {
 		string[] parts, releases = history.text.Split('\n');
 		for (int i = 0; i < releases.Length; i++) {
 			parts = releases[i].Split(',');
-			DateTime dt = DateTime.ParseExact(string.Format("{0} {1}", parts[3], parts[4]), "MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
-			build = string.Format("{0} ({1})", parts[6].Trim('\"'), dt.ToString("dd-MM-yyyy"));
+			DateTime dt = DateTime.ParseExact(string.Format("{0} {1}", parts[3], parts[4]), srcDT, CultureInfo.InvariantCulture);
+			build = string.Format("{0} ({1})", parts[6].Trim('\"'), dt.ToString(listDT));
 			fullList.Add(parts[0], build);
 		}
 		CheckNewVersion();
@@ -425,7 +441,8 @@ public class HelpLastRelease : EditorWindow {
 		Wait(wwwGithub, WaitGithub, ParseGithub);
 	}
 
-	#pragma warning disable 0649
+	#pragma warning disable 0649, 1635
+
 	[Serializable]
 	class GithubRelease {
 		public string created_at;
@@ -434,14 +451,17 @@ public class HelpLastRelease : EditorWindow {
 
 	[Serializable]
 	class GithubAsset {
+
 		public string browser_download_url;
 	}
-	#pragma warning restore 0649
+
+	#pragma warning restore 0649, 1635
 
 	static void ParseGithub(WWW github) {
 		var release = JsonUtility.FromJson<GithubRelease>(github.text);
-		string current = EditorPrefs.GetString(prefs + Application.productName, "1970-01-01T00:00:00Z");
-		if (DateTime.Parse(release.created_at) > DateTime.Parse(current)) {
+		string current = EditorPrefs.GetString(prefs + Application.productName, nullDT);
+		if (DateTime.ParseExact(release.created_at, universalDT, CultureInfo.InvariantCulture) > 
+		    DateTime.ParseExact(current, universalDT, CultureInfo.InvariantCulture)) {
 			DownloadPackage(release.assets[0].browser_download_url);
 			EditorPrefs.SetString(prefs + Application.productName, release.created_at);
 		}
@@ -465,7 +485,7 @@ public class HelpLastRelease : EditorWindow {
 		Debug.LogFormat("{0} updated from Github", scriptName);
 	}
 
-	static void SearchGUI() {
+	static void SearchVersionGUI() {
 		string s = string.Empty;
 		GUILayout.BeginHorizontal(GUI.skin.FindStyle("Toolbar"));
 		s = GUILayout.TextField(filterString, GUI.skin.FindStyle("ToolbarSeachTextField"));
