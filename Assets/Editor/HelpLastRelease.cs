@@ -10,16 +10,21 @@ using Debug = UnityEngine.Debug;
 
 public class HelpLastRelease : EditorWindow {
 
-	const string statsUrl = @"http://hwstats.unity3d.com/index.html";
+	#region Urls
+
+	//const string statsUrl = @"http://hwstats.unity3d.com/index.html";
 	const string experimenalUrl = @"http://unity3d.com/experimental";
 	const string roadmapUrl = @"http://unity3d.com/unity/roadmap";
+	const string statusCloudUrl = @"http://status.cloud.unity3d.com";
 
 	const string archiveUrl = @"http://unity3d.com/get-unity/download/archive";
 	const string betaArchiveUrl = @"http://unity3d.com/unity/beta/archive";
 	const string releaseUrl = @"http://beta.unity3d.com/download/{0}/download.html";
 
 	const string searchUrl = @"http://unity3d.com/search";
+	const string searchGoogleUrl = @"http://www.google.com/cse/home?cx=000020748284628035790:axpeo4rho5e";
 	const string searchGitHubUrl = @"http://unitylist.com";
+	const string searchIssueUrl = @"http://issuetracker.unity3d.com";
 
 	const string assistantUrl = @"http://beta.unity3d.com/download/{0}/UnityDownloadAssistant-{1}.{2}";
 	const string serverUrl = @"http://symbolserver.unity3d.com/";
@@ -27,13 +32,21 @@ public class HelpLastRelease : EditorWindow {
 
 	const string finalRN = @"http://unity3d.com/unity/whats-new/unity-";
 	const string betaRN = @"http://unity3d.com/unity/beta/unity";
-	const string patchRN = @"http://unity3d.com/unity/qa/patch-releases/";
-
-	const string githubUrl = @"http://api.github.com/repos/dmbond/CheckVersion/releases/latest";
+	const string patchRN = @"http://unity3d.com/unity/qa/patch-releases";
 
 	const string tutorialsUrl = @"http://unity3d.com/learn/tutorials";
 	const string knowledgeBaseUrl = @"http://support.unity3d.com";
+	const string customerServiceUrl = @"http://support.unity3d.com/hc/en-us/requests/new?ticket_form_id=65905";
 	const string liveTrainingUrl = @"http://unity3d.com/learn/live-training";
+	const string faqUrl = @"https://unity3d.com/unity/faq";
+
+	const string githubUTUrl = @"http://github.com/Unity-Technologies";
+	const string bitbucketUTUrl = @"http://bitbucket.org/Unity-Technologies";
+	const string newsUrl = @"http://unity_news.tggram.com";
+
+	const string githubUrl = @"http://api.github.com/repos/dmbond/CheckVersion/releases/latest";
+
+	#endregion
 
 	static readonly string zipName = Application.platform == RuntimePlatform.WindowsEditor ? "7z" : "7za";
 	const string baseName = "UnityYAMLMerge.ex";
@@ -52,14 +65,15 @@ public class HelpLastRelease : EditorWindow {
 	static bool isAssistant;
 
 	static HelpLastRelease window;
-	const string wndTitle = "Unity Builds";
+	static string wndTitle;
 	const string scriptName = "HelpLastRelease";
 	const string prefs = scriptName + ".";
 	const string prefsCount = prefs + "count";
-	// if you do not need autoupdate script from Github set to false
+	// if you do not need autoupdate from Github set to false
 	static bool autoUpdate = true;
 
 	static string filterString = "";
+	//static char[] splitChars = {'a', 'b', 'f', 'p'};
 	static string universalDT = "yyyy-MM-ddTHH:mm:ssZ";
 	static string nullDT = "1970-01-01T00:00:00Z";
 	static string srcDT = "MM/dd/yyyy HH:mm:ss";
@@ -82,13 +96,24 @@ public class HelpLastRelease : EditorWindow {
 		{ "2018.2.", Color.red },
 		{ "2018.3.", Color.red }
 	};
+	static Color oldColor = Color.white;
+	static Color currentColor = Color.black;
 	static float alphaBackForPersonal = 0.3f;
 
 	#region Menu
 
-	[MenuItem("Help/Links/Last Release...", false, 010)]
+	[MenuItem("Help/Links/Releases...", false, 010)]
 	static void Init() {
 		window = GetWindow<HelpLastRelease>(wndTitle);
+		SortList(String.Empty);
+	}
+
+	[MenuItem("Help/Links/Check for Updates...", false, 015)]
+	static void CheckforUpdates() {
+		window = GetWindow<HelpLastRelease>(wndTitle);
+		int index = Application.unityVersion.LastIndexOf('.');
+		string filter = Application.unityVersion.Substring(0, index + 1);
+		SortList(filter);
 	}
 	// ---
 
@@ -97,9 +122,19 @@ public class HelpLastRelease : EditorWindow {
 		Application.OpenURL(searchUrl);
 	}
 
+	[MenuItem("Help/Links/Search Google...", false, 100)]
+	static void OpenSearchGoogle() {
+		Application.OpenURL(searchGoogleUrl);
+	}
+
 	[MenuItem("Help/Links/Search GitHub...", false, 105)]
-	static void OpenAwesome() {
+	static void OpenSearchGitHub() {
 		Application.OpenURL(searchGitHubUrl);
+	}
+
+	[MenuItem("Help/Links/Search Issue...", false, 110)]
+	static void OpenSearchIssue() {
+		Application.OpenURL(searchIssueUrl);
 	}
 	// ---	
 
@@ -129,9 +164,19 @@ public class HelpLastRelease : EditorWindow {
 		Application.OpenURL(knowledgeBaseUrl);
 	}
 
+	[MenuItem("Help/Links/Customer Service...", false, 707)]
+	static void OpenCustomerService() {
+		Application.OpenURL(customerServiceUrl);
+	}
+
 	[MenuItem("Help/Links/Live Training...", false, 710)]
 	static void OpenLiveTraining() {
 		Application.OpenURL(liveTrainingUrl);
+	}
+
+	[MenuItem("Help/Links/FAQ...", false, 715)]
+	static void OpenFaq() {
+		Application.OpenURL(faqUrl);
 	}
 	// ---
 
@@ -145,9 +190,25 @@ public class HelpLastRelease : EditorWindow {
 		Application.OpenURL(experimenalUrl);
 	}
 
-	[MenuItem("Help/Links/Statistics...", false, 810)]
-	static void OpenStatistics() {
-		Application.OpenURL(statsUrl);
+	[MenuItem("Help/Links/Status Cloud...", false, 810)]
+	static void OpenStatusCloud() {
+		Application.OpenURL(statusCloudUrl);
+	}
+	// ---
+
+	[MenuItem("Help/Links/Github UT...", false, 830)]
+	static void OpenGithubUT() {
+		Application.OpenURL(githubUTUrl);
+	}
+
+	[MenuItem("Help/Links/Bitbucket UT...", false, 835)]
+	static void OpenBitbucketUT() {
+		Application.OpenURL(bitbucketUTUrl);
+	}
+
+	[MenuItem("Help/Links/News...", false, 840)]
+	static void OpenNews() {
+		Application.OpenURL(newsUrl);
 	}
 
 	#endregion
@@ -192,9 +253,9 @@ public class HelpLastRelease : EditorWindow {
 		foreach (var k in colors.Keys) {
 			bool isColored = currentList.Values[i].Contains(k);
 			if (EditorGUIUtility.isProSkin) {
-				GUI.contentColor = isColored ? colors[k] : Color.white;
+				GUI.contentColor = isColored ? colors[k] : oldColor;
 			} else {
-				GUI.backgroundColor = isColored ? colors[k] * alpha : Color.white * alpha;
+				GUI.backgroundColor = isColored ? colors[k] * alpha : oldColor * alpha;
 			}
 			if (isColored) break;
 		}
@@ -207,6 +268,8 @@ public class HelpLastRelease : EditorWindow {
 
 	[InitializeOnLoadMethod]
 	static void AutoUpdate() {
+		wndTitle = string.Format("{0} {1}", Application.HasProLicense() ? "Pro" : "Personal", Application.unityVersion);
+		colors.Add(Application.unityVersion, currentColor);
 		if (autoUpdate && Application.internetReachability != NetworkReachability.NotReachable) {
 			DownloadGithub();
 		}
@@ -254,6 +317,7 @@ public class HelpLastRelease : EditorWindow {
 			fullList.Add(parts[0], build);
 		}
 		CheckNewVersion();
+		if (!string.IsNullOrEmpty(filterString)) SortList(filterString);
 		if (window == null) {
 			HelpLastRelease[] w = Resources.FindObjectsOfTypeAll<HelpLastRelease>();
 			if (w != null && w.Length > 0) window = w[0];
@@ -292,7 +356,7 @@ public class HelpLastRelease : EditorWindow {
 		}
 	}
 
-	private static void DoWithRevision(string revision) {
+	static void DoWithRevision(string revision) {
 		if (!isAssistant) {
 			Application.OpenURL(string.Format(releaseUrl, revision));
 		} else {
@@ -489,23 +553,27 @@ public class HelpLastRelease : EditorWindow {
 		string s = string.Empty;
 		GUILayout.BeginHorizontal(GUI.skin.FindStyle("Toolbar"));
 		s = GUILayout.TextField(filterString, GUI.skin.FindStyle("ToolbarSeachTextField"));
-		if (GUILayout.Button("", GUI.skin.FindStyle("ToolbarSeachCancelButton"))) {
-			s = "";
+		if (GUILayout.Button(string.Empty, GUI.skin.FindStyle("ToolbarSeachCancelButton"))) {
+			s = string.Empty;
 			GUI.FocusControl(null);
 		}
 		GUILayout.EndHorizontal();
 		if (s != filterString) {
-			filterString = s;
-			if (!string.IsNullOrEmpty(filterString)) {
-				sortedList = new SortedList<string, string>();
-				for (int i = fullList.Count - 1; i >= 0; i--) {
-					if (fullList.Values[i].Contains(filterString)) {
-						sortedList.Add(fullList.Keys[i], fullList.Values[i]);
-					}
-				}
-				currentList = sortedList;
-			} else currentList = fullList;
+			SortList(s);
 		}
+	}
+
+	static void SortList(string filter) {
+		if (!string.IsNullOrEmpty(filter) && fullList != null) {
+			sortedList = new SortedList<string, string>();
+			for (int i = fullList.Count - 1; i >= 0; i--) {
+				if (fullList.Values[i].Contains(filter)) {
+					sortedList.Add(fullList.Keys[i], fullList.Values[i]);
+				}
+			}
+			currentList = sortedList;
+		} else currentList = fullList;
+		filterString = filter;
 	}
 
 	static void ProgressGUI(WWW www, string text) {
