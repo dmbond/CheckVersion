@@ -1,17 +1,16 @@
 # CheckVersion
 Checks for Unity updates
 
-![Screenshot](https://user-images.githubusercontent.com/15363149/35301179-e6d5d268-009b-11e8-8006-3669d4ccea4f.png "Screenshot")
+![Screenshot](https://user-images.githubusercontent.com/15363149/38339052-f46334a0-3874-11e8-877c-d140a307896c.png "Screenshot")
 
 ###### Help > Links > Releases...
-- **RN** open Release Notes (if exist)
-- **A** launch Download Assistant
-- button with version open download page
+- **A** launch Download Assistant for selected release
+- button with version show info about selected release
 
 ###### Help > Links > Check for Updates...
 Show builds for current branch
 
-![Screenshot](https://user-images.githubusercontent.com/15363149/35301943-03467888-009e-11e8-9044-29c4811c03e2.png "Screenshot")
+![Screenshot](https://user-images.githubusercontent.com/15363149/38339707-58f0bf0c-3878-11e8-9b4a-54edbe3e6db6.png "Screenshot")
 
 ###### Help > Links > Search...
 Open Unity Site Search (slow) http://unity3d.com/search

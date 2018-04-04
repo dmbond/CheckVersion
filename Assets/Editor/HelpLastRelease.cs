@@ -19,7 +19,10 @@ public class HelpLastRelease : EditorWindow {
 
 	const string archiveUrl = @"http://unity3d.com/get-unity/download/archive";
 	const string betaArchiveUrl = @"http://unity3d.com/unity/beta/archive";
-	const string releaseUrl = @"http://beta.unity3d.com/download/{0}/download.html";
+
+	const string releaseUrlBeta = @"http://beta.unity3d.com/download/{0}/{1}";
+	const string releaseUrlDownload = @"http://download.unity3d.com/download_unity/{0}/{1}";
+	const string releaseUrlNetstorage = @"https://netstorage.unity3d.com/unity/{0}/{1}";
 
 	const string searchUrl = @"http://unity3d.com/search";
 	const string searchGoogleUrl = @"http://www.google.com/cse/home?cx=000020748284628035790:axpeo4rho5e";
@@ -29,10 +32,11 @@ public class HelpLastRelease : EditorWindow {
 	const string assistantUrl = @"http://beta.unity3d.com/download/{0}/UnityDownloadAssistant-{1}.{2}";
 	const string serverUrl = @"http://symbolserver.unity3d.com/";
 	const string historyUrl = serverUrl + @"000Admin/history.txt";
+	const string iniUrl = @"http://beta.unity3d.com/download/{0}/unity-{1}-{2}.ini";
 
 	const string finalRN = @"http://unity3d.com/unity/whats-new/unity-";
 	const string betaRN = @"http://unity3d.com/unity/beta/unity";
-	const string patchRN = @"http://unity3d.com/unity/qa/patch-releases";
+	const string patchRN = @"http://unity3d.com/unity/qa/patch-releases/";
 
 	const string tutorialsUrl = @"http://unity3d.com/learn/tutorials";
 	const string knowledgeBaseUrl = @"http://support.unity3d.com";
@@ -56,49 +60,57 @@ public class HelpLastRelease : EditorWindow {
 
 	static WWW wwwHistory, wwwList, wwwMerger, wwwAssistant;
 	static WWW wwwGithub, wwwPackage;
+	static WWW wwwIniWin, wwwIniOSX, wwwIniLinux, wwwReleaseNotes;
 
-	static SortedList<string, string> fullList;
-	static SortedList<string, string> sortedList;
-	static SortedList<string, string> currentList;
+	static SortedList<string, string> fullList, sortedList, currentList;
 
-	static int idxSelectedInCurrent;
-	static bool isAssistant;
+	static int idxSelectedInCurrent = -1;
+	static string selectedVersion;
+	static string selectedRevision;
+	static Action ReleaseCallback;
+
+	static int idxOS = -1;
+	static readonly string[] titlesOS = { "Win", "OSX" };
+	static readonly string[] titlesOSLinux = { "Win", "OSX", "Linux" };
+	static Dictionary<string, Dictionary<string, string>> dictIniWin, dictIniOSX, dictIniLinux;
+	static bool hasLinux, hasReleaseNotes;
 
 	static HelpLastRelease window;
 	static string wndTitle;
 	const string scriptName = "HelpLastRelease";
 	const string prefs = scriptName + ".";
 	const string prefsCount = prefs + "count";
-	// if you do not need autoupdate from Github set to false
-	static bool autoUpdate = true;
 
 	static string filterString = "";
-	//static char[] splitChars = {'a', 'b', 'f', 'p'};
 	static string universalDT = "yyyy-MM-ddTHH:mm:ssZ";
 	static string nullDT = "1970-01-01T00:00:00Z";
 	static string srcDT = "MM/dd/yyyy HH:mm:ss";
 	static string listDT = "dd-MM-yyyy";
 	static GUIStyle btnStyle;
-	const float minWidth = 160f;
 	static Vector2 scrollPos;
 
 	const string rnTooltip = "Open Release Notes";
 	const string assistTooltip = "Open Download Assistant";
 	const string versionTooltip = "Open Download Page";
+	const string infoTooltip = "Show more info";
+	const string updateTooltip = "Update from Github";
 
-	static Dictionary<string, Color> colors = new Dictionary<string, Color>() {
-		{ "5.5.", Color.magenta },
+	static readonly Dictionary<string, Color> colors = new Dictionary<string, Color>() {
 		{ "5.6.", Color.blue },
 		{ "2017.1.", Color.cyan },
-		{ "2017.2.", Color.green },
+		{ "2017.2.", Color.magenta },
 		{ "2017.3.", Color.yellow },
+		{ "2017.4.", Color.green },
 		{ "2018.1.", Color.red },
 		{ "2018.2.", Color.red },
-		{ "2018.3.", Color.red }
+		{ "2018.3.", Color.red },
+		{ "2018.4.", Color.red }
 	};
 	static Color oldColor = Color.white;
 	static Color currentColor = Color.black;
 	static float alphaBackForPersonal = 0.3f;
+	static Color alpha = new Color(1f, 1f, 1f, alphaBackForPersonal);
+
 
 	#region Menu
 
@@ -215,41 +227,114 @@ public class HelpLastRelease : EditorWindow {
 
 	void OnGUI() {
 		if (fullList != null) {
+			GUILayout.BeginHorizontal();
 			ListGUI();
-		} else WaitGUI();
+			InfoGUI();
+			GUILayout.EndHorizontal();
+		} else {
+			WaitGUI();
+		}
 	}
 
-	public static void ListGUI() {
+	void ListGUI() {
 		btnStyle = new GUIStyle(EditorStyles.miniButton);
-		btnStyle.alignment = TextAnchor.MiddleLeft;
+		GUILayout.BeginVertical(GUILayout.Width(210));
 		SearchVersionGUI();
 		scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false);
 		if (currentList == null) currentList = fullList;
 		for (int i = currentList.Count - 1; i >= 0; i--) {
 			GUILayout.BeginHorizontal();
 			ColorGUI(i);
-			if (GUILayout.Button(new GUIContent("RN", rnTooltip), btnStyle)) {
-				OpenReleaseNotes(i);
-			}
+			btnStyle.alignment = TextAnchor.MiddleCenter;
 			if (GUILayout.Button(new GUIContent("A", assistTooltip), btnStyle)) {
-				DownloadList(i, true);
+				DownloadList(i, DownloadAssistant);
 			}
-			if (GUILayout.Button(new GUIContent(currentList.Values[i], versionTooltip), btnStyle, GUILayout.MinWidth(minWidth))) {
-				DownloadList(i);
+			btnStyle.alignment = TextAnchor.MiddleLeft;
+			if (GUILayout.Button(new GUIContent(currentList.Values[i], infoTooltip), btnStyle, GUILayout.MinWidth(160f))) {
+				DownloadList(i, UpdateInfo);
 			}
-			GUILayout.FlexibleSpace();
 			GUILayout.EndHorizontal();
 		}
 		EditorGUILayout.EndScrollView();
-		GUILayout.FlexibleSpace();
-		ProgressGUI(wwwAssistant, "Downloading Assistant");
-		ProgressGUI(wwwHistory, "Downloading History");
-		ProgressGUI(wwwList, "Downloading List");
-		ProgressGUI(wwwMerger, "Downloading Merger");
+		UpdateGUI();
+		GUILayout.EndVertical();
 	}
 
-	static void ColorGUI(int i) {
-		Color alpha = new Color(1f, 1f, 1f, alphaBackForPersonal);
+	void UpdateGUI() {
+		if (hasUpdate) {
+			GUILayout.Space(5f);
+			if (EditorGUIUtility.isProSkin) {
+				GUI.contentColor = Color.green;
+			} else {
+				GUI.backgroundColor = Color.green * alpha;
+			}
+			btnStyle.alignment = TextAnchor.MiddleCenter;
+			if (GUILayout.Button(new GUIContent("Update is available", updateTooltip), btnStyle)) {
+				if (release != null) {
+					hasUpdate = false;
+					DownloadPackage(release.assets[0].browser_download_url);
+					EditorPrefs.SetString(prefs + Application.productName, release.created_at);
+				}
+			}
+			GUILayout.Space(5f);
+		}
+	}
+
+	void InfoGUI() {
+		if (idxSelectedInCurrent == -1) return;
+		if (EditorGUIUtility.isProSkin) {
+			GUI.contentColor = oldColor;
+		} else {
+			GUI.backgroundColor = oldColor * alpha;
+		}
+		GUILayout.BeginVertical(GUILayout.Width(390));
+		GUILayout.Space(5f);
+		GUILayout.BeginHorizontal();
+		btnStyle.alignment = TextAnchor.MiddleCenter;
+		if (!string.IsNullOrEmpty(selectedRevision) && GUILayout.Button(new GUIContent(string.Format("{0} ({1})", selectedVersion, selectedRevision), versionTooltip), btnStyle)) {
+			Application.OpenURL(string.Format(releaseUrlBeta, selectedRevision, "download.html"));
+		}
+		if (hasReleaseNotes && GUILayout.Button(
+			new GUIContent("Release Notes", rnTooltip), btnStyle)) {
+			Application.OpenURL(VersionToReleaseNotesUrl(selectedVersion));
+		}
+		GUILayout.EndHorizontal();
+		Dictionary<string, Dictionary<string, string>> dict = null;
+		if (!string.IsNullOrEmpty(selectedRevision)) {
+			GUILayout.BeginHorizontal();
+			idxOS = GUILayout.SelectionGrid(idxOS, hasLinux ? titlesOSLinux : titlesOS, hasLinux ? 3 : 2,
+				btnStyle);
+			switch (idxOS) {
+				case 0:
+					dict = dictIniWin;
+					break;
+				case 1:
+					dict = dictIniOSX;
+					break;
+				case 2:
+					dict = dictIniLinux;
+					break;
+			}
+			GUILayout.EndHorizontal();
+		}
+		if (dict != null) {
+			GUILayout.BeginVertical();
+			GUILayout.Space(5f);
+			btnStyle.alignment = TextAnchor.MiddleLeft;
+			foreach (var key in dict.Keys) {
+				if (GUILayout.Button(new GUIContent(dict[key]["title"], dict[key]["description"]), btnStyle)) {
+					var url = dict[key]["url"].StartsWith("http") ? dict[key]["url"] :
+						string.Format(releaseUrlBeta, selectedRevision, dict[key]["url"]);
+					EditorGUIUtility.systemCopyBuffer = url;
+					ShowNotification(new GUIContent("URL copied to the clipboard"));
+				}
+			}
+			GUILayout.EndVertical();
+		}
+		GUILayout.EndVertical();
+	}
+
+	void ColorGUI(int i) {
 		foreach (var k in colors.Keys) {
 			bool isColored = currentList.Values[i].Contains(k);
 			if (EditorGUIUtility.isProSkin) {
@@ -268,9 +353,9 @@ public class HelpLastRelease : EditorWindow {
 
 	[InitializeOnLoadMethod]
 	static void AutoUpdate() {
-		wndTitle = string.Format("{0} {1}", Application.HasProLicense() ? "Pro" : "Personal", Application.unityVersion);
+		wndTitle = string.Format("v {0}", Application.unityVersion);
 		colors.Add(Application.unityVersion, currentColor);
-		if (autoUpdate && Application.internetReachability != NetworkReachability.NotReachable) {
+		if (Application.internetReachability != NetworkReachability.NotReachable) {
 			DownloadGithub();
 		}
 	}
@@ -281,28 +366,6 @@ public class HelpLastRelease : EditorWindow {
 			Directory.CreateDirectory(result);
 		}
 		return result;
-	}
-
-	static void OpenReleaseNotes(int num) {
-		string url = "", version = "";
-		if (currentList.Values[num].Contains("a")) {
-			Debug.LogWarningFormat("Release Notes for alpha version {0} are not available", currentList.Values[num]);
-			EditorApplication.Beep();
-			return;
-		}
-		if (currentList.Values[num].Contains("p")) {
-			version = currentList.Values[num].Split(' ')[0];
-			url = patchRN + version;
-		}
-		if (currentList.Values[num].Contains("f")) {
-			version = currentList.Values[num].Split('f')[0];
-			url = finalRN + version;
-		}
-		if (currentList.Values[num].Contains("b")) {
-			version = currentList.Values[num].Split(' ')[0];
-			url = betaRN + version;
-		}
-		if (!string.IsNullOrEmpty(url)) Application.OpenURL(url);
 	}
 
 	static void FillMenu(WWW history) {
@@ -347,27 +410,30 @@ public class HelpLastRelease : EditorWindow {
 			for (int i = 0; i < lines.Length; i++) {
 				if (lines[i].Contains(version)) {
 					int pos = lines[i].IndexOf(version);
-					string revision = lines[i].Substring(pos + version.Length, 12);
-					DoWithRevision(revision);
-					EditorPrefs.SetString(prefs + currentList.Keys[idxSelectedInCurrent], revision);
+					selectedRevision = lines[i].Substring(pos + version.Length, 12);
+					EditorPrefs.SetString(prefs + currentList.Keys[idxSelectedInCurrent], selectedRevision);
+					if (ReleaseCallback != null) ReleaseCallback();
+					window.Repaint();
 					break;
 				}
 			}
 		}
 	}
 
-	static void DoWithRevision(string revision) {
-		if (!isAssistant) {
-			Application.OpenURL(string.Format(releaseUrl, revision));
-		} else {
-			DownloadAssistant(revision);
+	static void UpdateInfo() {
+		idxOS = Application.platform == RuntimePlatform.WindowsEditor ? 0 : 1;
+		window.Repaint();
+		if (!string.IsNullOrEmpty(selectedRevision)) {
+			DownloadIniWin(selectedRevision, selectedVersion);
+			DownloadIniOSX(selectedRevision, selectedVersion);
+			DownloadIniLinux(selectedRevision, selectedVersion);
 		}
 	}
 
-	static void DownloadAssistant(string revision) {
-		string version = currentList.Values[idxSelectedInCurrent].Split(' ')[0];
+	static void DownloadAssistant() {
+		UpdateInfo();
 		string ext = Application.platform == RuntimePlatform.WindowsEditor ? "exe" : "dmg";
-		string url = string.Format(assistantUrl, revision, version, ext);
+		string url = string.Format(assistantUrl, selectedRevision, selectedVersion, ext);
 		wwwAssistant = new WWW(url);
 		EditorApplication.update += WaitAssistant;
 	}
@@ -377,19 +443,69 @@ public class HelpLastRelease : EditorWindow {
 		EditorApplication.update += WaitHistory;
 	}
 
-	static void DownloadList(int historyNum, bool assist = false) {
+	static void DownloadList(int historyNum, Action callback) {
 		idxSelectedInCurrent = historyNum;
-		isAssistant = assist;
-		string revision = EditorPrefs.GetString(prefs + currentList.Keys[idxSelectedInCurrent], "");
-		if (!string.IsNullOrEmpty(revision)) {
-			DoWithRevision(revision);
+		selectedVersion = currentList.Values[idxSelectedInCurrent].Split(' ')[0];
+		DownloadReleaseNotes(selectedVersion);
+		selectedRevision = EditorPrefs.GetString(prefs + currentList.Keys[idxSelectedInCurrent], "");
+		if (!string.IsNullOrEmpty(selectedRevision)) {
+			if (callback != null) callback();
 		} else {
-			string listUrl = string.Format("{0}000Admin/{1}", serverUrl, currentList.Keys[historyNum]);
+			ReleaseCallback = callback;
+			string listUrl = string.Format("{0}000Admin/{1}", serverUrl, currentList.Keys[idxSelectedInCurrent]);
 			wwwList = new WWW(listUrl);
 			EditorApplication.update += WaitList;
 		}
 	}
 
+	static string VersionToReleaseNotesUrl(string version) {
+		string url = null;
+		if (version.Contains("a")) {
+			url = betaRN;
+		}
+		if (version.Contains("p")) {
+			version = version.Split(' ')[0];
+			url = patchRN + version;
+		}
+		if (version.Contains("f")) {
+			version = version.Split('f')[0];
+			url = finalRN + version;
+		}
+		if (version.Contains("b")) {
+			version = version.Split(' ')[0];
+			url = betaRN + version;
+		}
+		return url;
+	}
+
+	static void DownloadReleaseNotes(string version) {
+		hasReleaseNotes = false;
+		wwwReleaseNotes = new WWW(VersionToReleaseNotesUrl(version));
+		EditorApplication.update += WaitReleaseNotes;
+	}
+
+	static void DownloadIniWin(string revision, string version) {
+		dictIniWin = null;
+		string url = String.Format(iniUrl, revision, version, "win");
+		wwwIniWin = new WWW(url);
+		EditorApplication.update += WaitIniWin;
+	}
+
+	static void DownloadIniOSX(string revision, string version) {
+		dictIniOSX = null;
+		string url = String.Format(iniUrl, revision, version, "osx");
+		wwwIniOSX = new WWW(url);
+		EditorApplication.update += WaitIniOSX;
+	}
+
+	static void DownloadIniLinux(string revision, string version) {
+		dictIniLinux = null;
+		hasLinux = false;
+		string url = String.Format(iniUrl, revision, version, "linux");
+		wwwIniLinux = new WWW(url);
+		EditorApplication.update += WaitIniLinux;
+	}
+	
 	static void WaitList() {
 		Wait(wwwList, WaitList, ParseList);
 	}
@@ -400,6 +516,22 @@ public class HelpLastRelease : EditorWindow {
 
 	static void WaitAssistant() {
 		Wait(wwwAssistant, WaitAssistant, SaveAssistant);
+	}
+
+	static void WaitReleaseNotes() {
+		Wait(wwwReleaseNotes, WaitReleaseNotes, ParseReleaseNotes);
+	}
+
+	static void WaitIniWin() {
+		Wait(wwwIniWin, WaitIniWin, ParseIniWin);
+	}
+
+	static void WaitIniOSX() {
+		Wait(wwwIniOSX, WaitIniOSX, ParseIniOSX);
+	}
+
+	static void WaitIniLinux() {
+		Wait(wwwIniLinux, WaitIniLinux, ParseIniLinux);
 	}
 
 	static void SaveAssistant(WWW assistant) {
@@ -439,24 +571,73 @@ public class HelpLastRelease : EditorWindow {
 			if (string.IsNullOrEmpty(www.error) && www.bytesDownloaded > 0) {
 				//Debug.LogFormat("{0} kB: {1}", www.size/1024, www.url);
 				if (action != null) action(www);
-			} else Debug.LogWarningFormat("{0} {1}", www.url, www.error);
-			www = null;
-		} else {
-			if (www == null) EditorApplication.update -= caller;
+			} //else Debug.LogWarningFormat("{0} {1}", www.url, www.error);
 		}
 	}
 
 	static void ParseList(WWW list) {
 		string[] files = list.text.Split('\n');
 		string[] parts;
+		string mergerUrl = null;
 		for (int i = 0; i < files.Length; i++) {
 			parts = files[i].Split(',');
 			if (parts[0].Contains(extractedName)) {
-				string mergerUrl = string.Format("{0}{1}/{2}", serverUrl, parts[0].Trim('\"').Replace('\\', '/'), compressedName);
+				mergerUrl = string.Format("{0}{1}/{2}", serverUrl, parts[0].Trim('\"').Replace('\\', '/'), compressedName);
 				DownloadMerger(mergerUrl);
 				break;
 			}
 		}
+		if (string.IsNullOrEmpty(mergerUrl) && ReleaseCallback != null) ReleaseCallback();
+	}
+
+	static void ParseIniWin(WWW ini) {
+		ParseIni(ini, out dictIniWin);
+	}
+
+	static void ParseIniOSX(WWW ini) {
+		ParseIni(ini, out dictIniOSX);
+	}
+
+	static void ParseIniLinux(WWW ini) {
+		hasLinux = wwwIniLinux != null && string.IsNullOrEmpty(wwwIniLinux.error);
+		if (hasLinux) {
+			ParseIni(ini, out dictIniLinux);
+		}
+	}
+
+	static void ParseIni(WWW ini, out Dictionary<string, Dictionary<string, string>> dictIni) {
+		string[] lines = ini.text.Split('\n');
+		string section = null;
+		Dictionary<string, string> dict = null;
+		dictIni = new Dictionary<string, Dictionary<string, string>>();
+		for (int i = 0; i < lines.Length; i++) {
+			string line = lines[i].Trim();
+			if (string.IsNullOrEmpty(line)) continue;
+			if (line.StartsWith("[") && line.EndsWith("]")) {
+				if (section != null && dict != null) {
+					dictIni.Add(section, dict);
+				}
+				section = line.Substring(1, line.Length - 2);
+				dict = new Dictionary<string, string>();
+			} else {
+				var parts = line.Split('=');
+				if (parts.Length > 1) {
+					dict.Add(parts[0].Trim(), parts[1].Trim());
+				}
+			}
+		}
+		if (section != null && dict != null) {
+			dictIni.Add(section, dict);
+		}
+		window.Repaint();
+	}
+
+	static void ParseReleaseNotes(WWW www) {
+		if (!string.IsNullOrEmpty(www.error) || www.text.Contains("404</h1>")) {
+			wwwReleaseNotes = null;
+		}
+		hasReleaseNotes = wwwReleaseNotes != null && string.IsNullOrEmpty(wwwReleaseNotes.error);
+		window.Repaint();
 	}
 
 	static void DownloadMerger(string mergerUrl) {
@@ -513,21 +694,24 @@ public class HelpLastRelease : EditorWindow {
 		public GithubAsset[] assets;
 	}
 
+	static GithubRelease release = null;
+
 	[Serializable]
 	class GithubAsset {
-
 		public string browser_download_url;
 	}
 
 	#pragma warning restore 0649, 1635
 
+	static bool hasUpdate = false;
+
 	static void ParseGithub(WWW github) {
-		var release = JsonUtility.FromJson<GithubRelease>(github.text);
+		release = JsonUtility.FromJson<GithubRelease>(github.text);
 		string current = EditorPrefs.GetString(prefs + Application.productName, nullDT);
 		if (DateTime.ParseExact(release.created_at, universalDT, CultureInfo.InvariantCulture) > 
 		    DateTime.ParseExact(current, universalDT, CultureInfo.InvariantCulture)) {
-			DownloadPackage(release.assets[0].browser_download_url);
-			EditorPrefs.SetString(prefs + Application.productName, release.created_at);
+			hasUpdate = true;
+			window.Repaint();
 		}
 	}
 
@@ -578,16 +762,27 @@ public class HelpLastRelease : EditorWindow {
 
 	static void ProgressGUI(WWW www, string text) {
 		if (www != null && !www.isDone && string.IsNullOrEmpty(www.error)) {
-			EditorGUI.ProgressBar(EditorGUILayout.GetControlRect(), www.progress, string.IsNullOrEmpty(www.error) ? text : www.error);
+			EditorGUI.ProgressBar(EditorGUILayout.GetControlRect(), www.progress, 
+				string.IsNullOrEmpty(www.error) ? 
+					string.Format("{0} ({1}%) {2} kB",
+						text,
+						Mathf.RoundToInt(www.progress * 100f),
+						www.bytesDownloaded / 1024) :
+					string.Format("{0} ({1}%) {2} kB",
+						www.error,
+						Mathf.RoundToInt(www.progress * 100f))
+			);
 		}
 	}
 
 	void WaitGUI() {
+		GUILayout.FlexibleSpace();
 		GUILayout.BeginHorizontal();
 		GUILayout.FlexibleSpace();
 		GUILayout.Label("Wait...");
 		GUILayout.FlexibleSpace();
 		GUILayout.EndHorizontal();
+		GUILayout.FlexibleSpace();
 	}
 
 }
