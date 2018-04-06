@@ -633,7 +633,7 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void ParseReleaseNotes(WWW www) {
-		if (!string.IsNullOrEmpty(www.error) || www.text.Contains("404</h1>")) {
+		if (!string.IsNullOrEmpty(www.error) || www.text.Contains("403</h1>") || www.text.Contains("404</h1>")) {
 			wwwReleaseNotes = null;
 		}
 		hasReleaseNotes = wwwReleaseNotes != null && string.IsNullOrEmpty(wwwReleaseNotes.error);
