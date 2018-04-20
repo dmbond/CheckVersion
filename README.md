@@ -16,7 +16,7 @@ Show builds for current branch
 Open Unity Site Search (slow) http://unity3d.com/search
 
 ###### Help > Links > Search Google...
-Open Google Custom Search (fast) http://www.google.com/cse/home?cx=000020748284628035790:axpeo4rho5e
+Open Google Custom Search (fast) http://www.google.com/cse/publicurl?cx=000020748284628035790:axpeo4rho5e
 
 ###### Help > Links > Search GitHub...
 Open (GitHub) Open Source Search Engine http://unitylist.com
@@ -27,6 +27,9 @@ Open Search Issue Tracker http://issuetracker.unity3d.com
 
 ###### Help > Links > Archive...
 Open Unity final archive http://unity3d.com/get-unity/download/archive
+
+###### Help > Links > LTS Archive...
+Open Unity LTS archive http://unity3d.com/unity/qa/lts-releases
 
 ###### Help > Links > Beta Archive...
 Open Unity beta archive http://unity3d.com/unity/beta/archive

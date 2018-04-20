@@ -12,20 +12,17 @@ public class HelpLastRelease : EditorWindow {
 
 	#region Urls
 
-	//const string statsUrl = @"http://hwstats.unity3d.com/index.html";
 	const string experimenalUrl = @"http://unity3d.com/experimental";
 	const string roadmapUrl = @"http://unity3d.com/unity/roadmap";
 	const string statusCloudUrl = @"http://status.cloud.unity3d.com";
 
 	const string archiveUrl = @"http://unity3d.com/get-unity/download/archive";
 	const string betaArchiveUrl = @"http://unity3d.com/unity/beta/archive";
-
+	const string ltsArchiveUrl = @"http://unity3d.com/unity/qa/lts-releases";
 	const string releaseUrlBeta = @"http://beta.unity3d.com/download/{0}/{1}";
-	const string releaseUrlDownload = @"http://download.unity3d.com/download_unity/{0}/{1}";
-	const string releaseUrlNetstorage = @"https://netstorage.unity3d.com/unity/{0}/{1}";
 
 	const string searchUrl = @"http://unity3d.com/search";
-	const string searchGoogleUrl = @"http://www.google.com/cse/home?cx=000020748284628035790:axpeo4rho5e";
+	const string searchGoogleUrl = @"http://www.google.com/cse/publicurl?cx=000020748284628035790:axpeo4rho5e";
 	const string searchGitHubUrl = @"http://unitylist.com";
 	const string searchIssueUrl = @"http://issuetracker.unity3d.com";
 
@@ -96,12 +93,11 @@ public class HelpLastRelease : EditorWindow {
 	const string updateTooltip = "Update from Github";
 
 	static readonly Dictionary<string, Color> colors = new Dictionary<string, Color>() {
-		{ "5.6.", Color.blue },
-		{ "2017.1.", Color.cyan },
-		{ "2017.2.", Color.magenta },
-		{ "2017.3.", Color.yellow },
+		{ "2017.1.", Color.blue },
+		{ "2017.2.", Color.cyan },
+		{ "2017.3.", Color.magenta },
 		{ "2017.4.", Color.green },
-		{ "2018.1.", Color.red },
+		{ "2018.1.", Color.yellow },
 		{ "2018.2.", Color.red },
 		{ "2018.3.", Color.red },
 		{ "2018.4.", Color.red }
@@ -153,6 +149,11 @@ public class HelpLastRelease : EditorWindow {
 	[MenuItem("Help/Links/Archive...", false, 200)]
 	static void OpenArchive() {
 		Application.OpenURL(archiveUrl);
+	}
+
+	[MenuItem("Help/Links/LTS Archive...", false, 205)]
+	static void OpenLTSArchive() {
+		Application.OpenURL(ltsArchiveUrl);
 	}
 
 	[MenuItem("Help/Links/Beta Archive...", false, 205)]
@@ -246,6 +247,9 @@ public class HelpLastRelease : EditorWindow {
 			GUILayout.BeginHorizontal();
 			ColorGUI(i);
 			btnStyle.alignment = TextAnchor.MiddleCenter;
+			#if UNITY_5_5_OR_NEWER
+			if (Application.platform != RuntimePlatform.LinuxEditor)			
+			#endif
 			if (GUILayout.Button(new GUIContent("A", assistTooltip), btnStyle)) {
 				DownloadList(i, DownloadAssistant);
 			}
@@ -602,6 +606,12 @@ public class HelpLastRelease : EditorWindow {
 		hasLinux = wwwIniLinux != null && string.IsNullOrEmpty(wwwIniLinux.error);
 		if (hasLinux) {
 			ParseIni(ini, out dictIniLinux);
+			#if UNITY_5_5_OR_NEWER
+			if (Application.platform == RuntimePlatform.LinuxEditor) {
+				idxOS = 2;
+				window.Repaint();
+			}
+			#endif
 		}
 	}
 
@@ -686,7 +696,7 @@ public class HelpLastRelease : EditorWindow {
 		Wait(wwwGithub, WaitGithub, ParseGithub);
 	}
 
-	#pragma warning disable 0649, 1635
+#pragma warning disable 0649, 1635
 
 	[Serializable]
 	class GithubRelease {
@@ -701,7 +711,7 @@ public class HelpLastRelease : EditorWindow {
 		public string browser_download_url;
 	}
 
-	#pragma warning restore 0649, 1635
+#pragma warning restore 0649, 1635
 
 	static bool hasUpdate = false;
 
@@ -711,7 +721,7 @@ public class HelpLastRelease : EditorWindow {
 		if (DateTime.ParseExact(release.created_at, universalDT, CultureInfo.InvariantCulture) > 
 		    DateTime.ParseExact(current, universalDT, CultureInfo.InvariantCulture)) {
 			hasUpdate = true;
-			window.Repaint();
+			if (window != null) window.Repaint();
 		}
 	}
 
