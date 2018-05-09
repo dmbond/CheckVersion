@@ -77,6 +77,7 @@ public class HelpLastRelease : EditorWindow {
 	const string scriptName = "HelpLastRelease";
 	const string prefs = scriptName + ".";
 	const string prefsCount = prefs + "count";
+	static bool hasUpdate = false;
 
 	static string filterString = "";
 	static string universalDT = "yyyy-MM-ddTHH:mm:ssZ";
@@ -277,7 +278,6 @@ public class HelpLastRelease : EditorWindow {
 				if (release != null) {
 					hasUpdate = false;
 					DownloadPackage(release.assets[0].browser_download_url);
-					EditorPrefs.SetString(prefs + Application.productName, release.created_at);
 				}
 			}
 			GUILayout.Space(5f);
@@ -300,7 +300,7 @@ public class HelpLastRelease : EditorWindow {
 		}
 		if (hasReleaseNotes && GUILayout.Button(
 			new GUIContent("Release Notes", rnTooltip), btnStyle)) {
-			Application.OpenURL(VersionToReleaseNotesUrl(selectedVersion));
+			Application.OpenURL(wwwReleaseNotes.url);
 		}
 		GUILayout.EndHorizontal();
 		Dictionary<string, Dictionary<string, string>> dict = null;
@@ -450,7 +450,7 @@ public class HelpLastRelease : EditorWindow {
 	static void DownloadList(int historyNum, Action callback) {
 		idxSelectedInCurrent = historyNum;
 		selectedVersion = currentList.Values[idxSelectedInCurrent].Split(' ')[0];
-		DownloadReleaseNotes(selectedVersion);
+		DownloadReleaseNotes(VersionToReleaseNotesUrl(selectedVersion));
 		selectedRevision = EditorPrefs.GetString(prefs + currentList.Keys[idxSelectedInCurrent], "");
 		if (!string.IsNullOrEmpty(selectedRevision)) {
 			if (callback != null) callback();
@@ -462,29 +462,34 @@ public class HelpLastRelease : EditorWindow {
 		}
 	}
 
-	static string VersionToReleaseNotesUrl(string version) {
+	static string VersionToReleaseNotesUrl(string version, bool repeat = false) {
 		string url = null;
+		string versionDigits;
 		if (version.Contains("a")) {
 			url = betaRN;
 		}
 		if (version.Contains("p")) {
-			version = version.Split(' ')[0];
-			url = patchRN + version;
+			versionDigits = version.Split(' ')[0];
+			url = patchRN + versionDigits;
 		}
 		if (version.Contains("f")) {
-			version = version.Split('f')[0];
-			url = finalRN + version;
+			versionDigits = version.Split('f')[0];
+			if (versionDigits.EndsWith("0") && repeat == false) {
+				url = betaRN + version;
+			} else {
+				url = finalRN + versionDigits;
+			}
 		}
 		if (version.Contains("b")) {
-			version = version.Split(' ')[0];
-			url = betaRN + version;
+			versionDigits = version.Split(' ')[0];
+			url = betaRN + versionDigits;
 		}
 		return url;
 	}
 
-	static void DownloadReleaseNotes(string version) {
+	static void DownloadReleaseNotes(string url) {
 		hasReleaseNotes = false;
-		wwwReleaseNotes = new WWW(VersionToReleaseNotesUrl(version));
+		wwwReleaseNotes = new WWW(url);
 		EditorApplication.update += WaitReleaseNotes;
 	}
 
@@ -645,9 +650,10 @@ public class HelpLastRelease : EditorWindow {
 	static void ParseReleaseNotes(WWW www) {
 		if (!string.IsNullOrEmpty(www.error) || www.text.Contains("403</h1>") || www.text.Contains("404</h1>")) {
 			wwwReleaseNotes = null;
+			DownloadReleaseNotes(VersionToReleaseNotesUrl(selectedVersion, true));
 		}
 		hasReleaseNotes = wwwReleaseNotes != null && string.IsNullOrEmpty(wwwReleaseNotes.error);
-		window.Repaint();
+		if (hasReleaseNotes) window.Repaint();
 	}
 
 	static void DownloadMerger(string mergerUrl) {
@@ -713,8 +719,6 @@ public class HelpLastRelease : EditorWindow {
 
 #pragma warning restore 0649, 1635
 
-	static bool hasUpdate = false;
-
 	static void ParseGithub(WWW github) {
 		release = JsonUtility.FromJson<GithubRelease>(github.text);
 		string current = EditorPrefs.GetString(prefs + Application.productName, nullDT);
@@ -740,6 +744,7 @@ public class HelpLastRelease : EditorWindow {
 		string path = Path.Combine(tempDir, name);
 		File.WriteAllBytes(path, package.bytes);
 		AssetDatabase.ImportPackage(path, false);
+		EditorPrefs.SetString(prefs + Application.productName, release.created_at);
 		Debug.LogFormat("{0} updated from Github", scriptName);
 	}
 
