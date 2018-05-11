@@ -481,7 +481,7 @@ public class HelpLastRelease : EditorWindow {
 			DownloadIniWin(selectedRevision, selectedVersion);
 			DownloadIniOSX(selectedRevision, selectedVersion);
 			DownloadIniLinux(selectedRevision, selectedVersion);
-			if (selectedVersion.Contains("f")) DownloadTorrent(selectedRevision);
+			DownloadTorrent(selectedRevision, selectedVersion);
 		}
 	}
 
@@ -550,11 +550,13 @@ public class HelpLastRelease : EditorWindow {
 		EditorApplication.update += WaitReleaseNotes;
 	}
 
-	static void DownloadTorrent(string revision) {
+	static void DownloadTorrent(string revision, string version) {
 		hasTorrent = false;
-		string url = String.Format(torrentUrl, revision);
-		wwwTorrent = new WWW(url);
-		EditorApplication.update += WaitTorrent;
+		if (version.Contains("f")) {
+			string url = String.Format(torrentUrl, revision);
+			wwwTorrent = new WWW(url);
+			EditorApplication.update += WaitTorrent;
+		}
 	}
 
 	static void DownloadIniWin(string revision, string version) {
