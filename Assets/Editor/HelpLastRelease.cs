@@ -27,6 +27,7 @@ public class HelpLastRelease : EditorWindow {
 	const string searchIssueUrl = @"http://issuetracker.unity3d.com";
 
 	const string assistantUrl = @"http://beta.unity3d.com/download/{0}/UnityDownloadAssistant-{1}.{2}";
+	const string torrentUrl = @"http://download.unity3d.com/download_unity/{0}/Unity.torrent";
 	const string serverUrl = @"http://symbolserver.unity3d.com/";
 	const string historyUrl = serverUrl + @"000Admin/history.txt";
 	const string iniUrl = @"http://beta.unity3d.com/download/{0}/unity-{1}-{2}.ini";
@@ -50,6 +51,25 @@ public class HelpLastRelease : EditorWindow {
 
 	#endregion
 
+	#region Vars
+
+	#pragma warning disable 0649, 1635
+
+	[Serializable]
+	class GithubRelease {
+		public string created_at;
+		public GithubAsset[] assets;
+	}
+
+	static GithubRelease release = null;
+
+	[Serializable]
+	class GithubAsset {
+		public string browser_download_url;
+	}
+
+	#pragma warning restore 0649, 1635
+
 	static readonly string zipName = Application.platform == RuntimePlatform.WindowsEditor ? "7z" : "7za";
 	const string baseName = "UnityYAMLMerge.ex";
 	const string compressedName = baseName + "_";
@@ -58,7 +78,8 @@ public class HelpLastRelease : EditorWindow {
 
 	static WWW wwwHistory, wwwList, wwwMerger, wwwAssistant;
 	static WWW wwwGithub, wwwPackage;
-	static WWW wwwIniWin, wwwIniOSX, wwwIniLinux, wwwReleaseNotes;
+	static WWW wwwIniWin, wwwIniOSX, wwwIniLinux;
+	static WWW wwwReleaseNotes, wwwTorrent;
 
 	static SortedList<string, string> fullList, sortedList, currentList;
 
@@ -71,7 +92,7 @@ public class HelpLastRelease : EditorWindow {
 	static readonly string[] titlesOS = { "Win", "OSX" };
 	static readonly string[] titlesOSLinux = { "Win", "OSX", "Linux" };
 	static Dictionary<string, Dictionary<string, string>> dictIniWin, dictIniOSX, dictIniLinux;
-	static bool hasLinux, hasReleaseNotes;
+	static bool hasLinux, hasReleaseNotes, hasTorrent;
 
 	static HelpLastRelease window;
 	static string wndTitle;
@@ -89,6 +110,7 @@ public class HelpLastRelease : EditorWindow {
 	static Vector2 scrollPos;
 
 	const string rnTooltip = "Open Release Notes";
+	const string torrentTooltip = "Open Torrent";
 	const string assistTooltip = "Open Download Assistant";
 	const string versionTooltip = "Open Download Page";
 	const string infoTooltip = "Show more info";
@@ -109,6 +131,7 @@ public class HelpLastRelease : EditorWindow {
 	static float alphaBackForPersonal = 0.3f;
 	static Color alpha = new Color(1f, 1f, 1f, alphaBackForPersonal);
 
+	#endregion
 
 	#region Menu
 
@@ -228,6 +251,8 @@ public class HelpLastRelease : EditorWindow {
 
 	#endregion
 
+	#region GUI
+
 	void OnGUI() {
 		if (fullList != null) {
 			GUILayout.BeginHorizontal();
@@ -303,6 +328,10 @@ public class HelpLastRelease : EditorWindow {
 			new GUIContent("Release Notes", rnTooltip), btnStyle)) {
 			Application.OpenURL(wwwReleaseNotes.url);
 		}
+		if (hasTorrent && GUILayout.Button(
+			new GUIContent("Torrent", torrentTooltip), btnStyle)) {
+			StartTorrent();
+		}
 		GUILayout.EndHorizontal();
 		Dictionary<string, Dictionary<string, string>> dict = null;
 		if (!string.IsNullOrEmpty(selectedRevision)) {
@@ -351,26 +380,18 @@ public class HelpLastRelease : EditorWindow {
 		}
 	}
 
-	void OnEnable() {
-		tempDir = SetTempDir();
-		DownloadHistory();
-	}
-
-	[InitializeOnLoadMethod]
-	static void AutoUpdate() {
-		wndTitle = string.Format("v {0}", Application.unityVersion);
-		colors.Add(Application.unityVersion, currentColor);
-		if (Application.internetReachability != NetworkReachability.NotReachable) {
-			DownloadGithub();
+	static void SearchVersionGUI() {
+		string s = string.Empty;
+		GUILayout.BeginHorizontal(GUI.skin.FindStyle("Toolbar"));
+		s = GUILayout.TextField(filterString, GUI.skin.FindStyle("ToolbarSeachTextField"));
+		if (GUILayout.Button(string.Empty, GUI.skin.FindStyle("ToolbarSeachCancelButton"))) {
+			s = string.Empty;
+			GUI.FocusControl(null);
 		}
-	}
-
-	static string SetTempDir() {
-		string result = string.Format("{0}/../Temp/{1}", Application.dataPath, scriptName);
-		if (!Directory.Exists(result)) {
-			Directory.CreateDirectory(result);
+		GUILayout.EndHorizontal();
+		if (s != filterString) {
+			SortList(s);
 		}
-		return result;
 	}
 
 	static void FillMenu(WWW history) {
@@ -393,37 +414,65 @@ public class HelpLastRelease : EditorWindow {
 		if (window != null) window.Repaint();
 	}
 
-	static void CheckNewVersion() {
-		int count = EditorPrefs.GetInt(prefsCount, 0);
-		if (fullList.Count > count) {
-			EditorApplication.Beep();
-			string color = EditorGUIUtility.isProSkin ? "yellow" : "red";
-			Debug.LogFormat("New version: <color={0}>{1}</color>", color,
-				fullList.Values[fullList.Count - 1]);
-			EditorPrefs.SetInt(prefsCount, fullList.Count);
-			currentList = null;
+	static void SortList(string filter) {
+		if (!string.IsNullOrEmpty(filter) && fullList != null) {
+			sortedList = new SortedList<string, string>();
+			for (int i = fullList.Count - 1; i >= 0; i--) {
+				if (fullList.Values[i].Contains(filter)) {
+					sortedList.Add(fullList.Keys[i], fullList.Values[i]);
+				}
+			}
+			currentList = sortedList;
+		} else currentList = fullList;
+		filterString = filter;
+	}
+
+	static void ProgressGUI(WWW www, string text) {
+		if (www != null && !www.isDone && string.IsNullOrEmpty(www.error)) {
+			EditorGUI.ProgressBar(EditorGUILayout.GetControlRect(), www.progress,
+				string.IsNullOrEmpty(www.error) ?
+					string.Format("{0} ({1}%) {2} kB",
+						text,
+						Mathf.RoundToInt(www.progress * 100f),
+						www.bytesDownloaded / 1024) :
+					string.Format("{0} ({1}%) {2} kB",
+						www.error,
+						Mathf.RoundToInt(www.progress * 100f))
+			);
 		}
 	}
 
-	static void SearchVersion() {
-		string path = Path.Combine(tempDir, extractedName);
-		if (File.Exists(path)) {
-			string[] lines;
-			lines = File.ReadAllLines(path, Encoding.Unicode);
-			FileUtil.DeleteFileOrDirectory(Path.GetDirectoryName(path));
-			string version = currentList.Values[idxSelectedInCurrent].Split(' ')[0] + "_";
-			for (int i = 0; i < lines.Length; i++) {
-				if (lines[i].Contains(version)) {
-					int pos = lines[i].IndexOf(version);
-					selectedRevision = lines[i].Substring(pos + version.Length, 12);
-					EditorPrefs.SetString(prefs + currentList.Keys[idxSelectedInCurrent], selectedRevision);
-					if (ReleaseCallback != null) ReleaseCallback();
-					window.Repaint();
-					break;
-				}
-			}
+	void WaitGUI() {
+		GUILayout.FlexibleSpace();
+		GUILayout.BeginHorizontal();
+		GUILayout.FlexibleSpace();
+		GUILayout.Label("Wait...");
+		GUILayout.FlexibleSpace();
+		GUILayout.EndHorizontal();
+		GUILayout.FlexibleSpace();
+	}
+
+	#endregion
+
+	#region Window
+
+	void OnEnable() {
+		tempDir = SetTempDir();
+		DownloadHistory();
+	}
+
+	[InitializeOnLoadMethod]
+	static void AutoUpdate() {
+		wndTitle = string.Format("v {0}", Application.unityVersion);
+		colors.Add(Application.unityVersion, currentColor);
+		if (Application.internetReachability != NetworkReachability.NotReachable) {
+			DownloadGithub();
 		}
 	}
+
+	#endregion
+
+	#region Download
 
 	static void UpdateInfo() {
 		idxOS = Application.platform == RuntimePlatform.WindowsEditor ? 0 : 1;
@@ -432,6 +481,7 @@ public class HelpLastRelease : EditorWindow {
 			DownloadIniWin(selectedRevision, selectedVersion);
 			DownloadIniOSX(selectedRevision, selectedVersion);
 			DownloadIniLinux(selectedRevision, selectedVersion);
+			if (selectedVersion.Contains("f")) DownloadTorrent(selectedRevision);
 		}
 	}
 
@@ -500,6 +550,13 @@ public class HelpLastRelease : EditorWindow {
 		EditorApplication.update += WaitReleaseNotes;
 	}
 
+	static void DownloadTorrent(string revision) {
+		hasTorrent = false;
+		string url = String.Format(torrentUrl, revision);
+		wwwTorrent = new WWW(url);
+		EditorApplication.update += WaitTorrent;
+	}
+
 	static void DownloadIniWin(string revision, string version) {
 		dictIniWin = null;
 		string url = String.Format(iniUrl, revision, version, "win");
@@ -521,7 +578,26 @@ public class HelpLastRelease : EditorWindow {
 		wwwIniLinux = new WWW(url);
 		EditorApplication.update += WaitIniLinux;
 	}
-	
+
+	static void DownloadMerger(string mergerUrl) {
+		wwwMerger = new WWW(mergerUrl);
+		EditorApplication.update += WaitMerger;
+	}
+
+	static void DownloadPackage(string packageUrl) {
+		wwwPackage = new WWW(packageUrl);
+		EditorApplication.update += WaitPackage;
+	}
+
+	static void DownloadGithub() {
+		wwwGithub = new WWW(githubUrl);
+		EditorApplication.update += WaitGithub;
+	}
+
+	#endregion
+
+	#region Wait
+
 	static void WaitList() {
 		Wait(wwwList, WaitList, ParseList);
 	}
@@ -538,6 +614,10 @@ public class HelpLastRelease : EditorWindow {
 		Wait(wwwReleaseNotes, WaitReleaseNotes, ParseReleaseNotes);
 	}
 
+	static void WaitTorrent() {
+		Wait(wwwTorrent, WaitTorrent, ProcessTorrent);
+	}
+
 	static void WaitIniWin() {
 		Wait(wwwIniWin, WaitIniWin, ParseIniWin);
 	}
@@ -549,6 +629,32 @@ public class HelpLastRelease : EditorWindow {
 	static void WaitIniLinux() {
 		Wait(wwwIniLinux, WaitIniLinux, ParseIniLinux);
 	}
+
+	static void WaitMerger() {
+		Wait(wwwMerger, WaitMerger, SaveMerger);
+	}
+
+	static void WaitGithub() {
+		Wait(wwwGithub, WaitGithub, ParseGithub);
+	}
+
+	static void WaitPackage() {
+		Wait(wwwPackage, WaitPackage, ImportPackage);
+	}
+
+	static void Wait(WWW www, EditorApplication.CallbackFunction caller, Action<WWW> action) {
+		if (www != null && www.isDone) {
+			EditorApplication.update -= caller;
+			if (string.IsNullOrEmpty(www.error) && www.bytesDownloaded > 0) {
+				//Debug.LogFormat("{0} kB: {1}", www.size/1024, www.url);
+				if (action != null) action(www);
+			} //else Debug.LogWarningFormat("{0} {1}", www.url, www.error);
+		}
+	}
+
+	#endregion
+
+	#region Actions after download
 
 	static void SaveAssistant(WWW assistant) {
 		if (!Directory.Exists(tempDir)) {
@@ -578,16 +684,6 @@ public class HelpLastRelease : EditorWindow {
 			}
 		} catch (Exception e) {
 			Debug.LogErrorFormat("{0} {1}\n{2}", cmd, arg, e.Message);
-		}
-	}
-
-	static void Wait(WWW www, EditorApplication.CallbackFunction caller, Action<WWW> action) {
-		if (www != null && www.isDone) {
-			EditorApplication.update -= caller;
-			if (string.IsNullOrEmpty(www.error) && www.bytesDownloaded > 0) {
-				//Debug.LogFormat("{0} kB: {1}", www.size/1024, www.url);
-				if (action != null) action(www);
-			} //else Debug.LogWarningFormat("{0} {1}", www.url, www.error);
 		}
 	}
 
@@ -663,13 +759,32 @@ public class HelpLastRelease : EditorWindow {
 		if (hasReleaseNotes) window.Repaint();
 	}
 
-	static void DownloadMerger(string mergerUrl) {
-		wwwMerger = new WWW(mergerUrl);
-		EditorApplication.update += WaitMerger;
+	static void ProcessTorrent(WWW www) {
+		if (!string.IsNullOrEmpty(www.error) || www.text.Contains("403</h1>") || www.text.Contains("404</h1>")) {
+			wwwTorrent = null;
+		}
+		hasTorrent = wwwTorrent != null && string.IsNullOrEmpty(wwwTorrent.error);
+		if (hasTorrent) {
+			SaveTorrent(wwwTorrent);
+			window.Repaint();
+		}
 	}
 
-	static void WaitMerger() {
-		Wait(wwwMerger, WaitMerger, SaveMerger);
+	static void SaveTorrent(WWW torrent) {
+		if (!Directory.Exists(tempDir)) {
+			Directory.CreateDirectory(tempDir);
+		}
+		string path = Path.Combine(tempDir, "Unity.torrent");
+		File.WriteAllBytes(path, torrent.bytes);
+	}
+
+	static void StartTorrent() {
+		string path = Path.Combine(tempDir, "Unity.torrent");
+		if (File.Exists(path)) {
+			Application.OpenURL(path);
+		} else {
+			Application.OpenURL(wwwTorrent.url);
+		}
 	}
 
 	static void SaveMerger(WWW merger) {
@@ -700,32 +815,6 @@ public class HelpLastRelease : EditorWindow {
 		}
 	}
 
-	static void DownloadGithub() {
-		wwwGithub = new WWW(githubUrl);
-		EditorApplication.update += WaitGithub;
-	}
-
-	static void WaitGithub() {
-		Wait(wwwGithub, WaitGithub, ParseGithub);
-	}
-
-#pragma warning disable 0649, 1635
-
-	[Serializable]
-	class GithubRelease {
-		public string created_at;
-		public GithubAsset[] assets;
-	}
-
-	static GithubRelease release = null;
-
-	[Serializable]
-	class GithubAsset {
-		public string browser_download_url;
-	}
-
-#pragma warning restore 0649, 1635
-
 	static void ParseGithub(WWW github) {
 		release = JsonUtility.FromJson<GithubRelease>(github.text);
 		string current = EditorPrefs.GetString(prefs + Application.productName, nullDT);
@@ -734,15 +823,6 @@ public class HelpLastRelease : EditorWindow {
 			hasUpdate = true;
 			if (window != null) window.Repaint();
 		}
-	}
-
-	static void DownloadPackage(string packageUrl) {
-		wwwPackage = new WWW(packageUrl);
-		EditorApplication.update += WaitPackage;
-	}
-
-	static void WaitPackage() {
-		Wait(wwwPackage, WaitPackage, ImportPackage);
 	}
 
 	static void ImportPackage(WWW package) {
@@ -755,56 +835,46 @@ public class HelpLastRelease : EditorWindow {
 		Debug.LogFormat("{0} updated from Github", scriptName);
 	}
 
-	static void SearchVersionGUI() {
-		string s = string.Empty;
-		GUILayout.BeginHorizontal(GUI.skin.FindStyle("Toolbar"));
-		s = GUILayout.TextField(filterString, GUI.skin.FindStyle("ToolbarSeachTextField"));
-		if (GUILayout.Button(string.Empty, GUI.skin.FindStyle("ToolbarSeachCancelButton"))) {
-			s = string.Empty;
-			GUI.FocusControl(null);
+	static string SetTempDir() {
+		string result = string.Format("{0}/../Temp/{1}", Application.dataPath, scriptName);
+		if (!Directory.Exists(result)) {
+			Directory.CreateDirectory(result);
 		}
-		GUILayout.EndHorizontal();
-		if (s != filterString) {
-			SortList(s);
+		return result;
+	}
+
+	static void CheckNewVersion() {
+		int count = EditorPrefs.GetInt(prefsCount, 0);
+		if (fullList.Count > count) {
+			EditorApplication.Beep();
+			string color = EditorGUIUtility.isProSkin ? "yellow" : "red";
+			Debug.LogFormat("New version: <color={0}>{1}</color>", color,
+				fullList.Values[fullList.Count - 1]);
+			EditorPrefs.SetInt(prefsCount, fullList.Count);
+			currentList = null;
 		}
 	}
 
-	static void SortList(string filter) {
-		if (!string.IsNullOrEmpty(filter) && fullList != null) {
-			sortedList = new SortedList<string, string>();
-			for (int i = fullList.Count - 1; i >= 0; i--) {
-				if (fullList.Values[i].Contains(filter)) {
-					sortedList.Add(fullList.Keys[i], fullList.Values[i]);
+	static void SearchVersion() {
+		string path = Path.Combine(tempDir, extractedName);
+		if (File.Exists(path)) {
+			string[] lines;
+			lines = File.ReadAllLines(path, Encoding.Unicode);
+			FileUtil.DeleteFileOrDirectory(Path.GetDirectoryName(path));
+			string version = currentList.Values[idxSelectedInCurrent].Split(' ')[0] + "_";
+			for (int i = 0; i < lines.Length; i++) {
+				if (lines[i].Contains(version)) {
+					int pos = lines[i].IndexOf(version);
+					selectedRevision = lines[i].Substring(pos + version.Length, 12);
+					EditorPrefs.SetString(prefs + currentList.Keys[idxSelectedInCurrent], selectedRevision);
+					if (ReleaseCallback != null) ReleaseCallback();
+					window.Repaint();
+					break;
 				}
 			}
-			currentList = sortedList;
-		} else currentList = fullList;
-		filterString = filter;
-	}
-
-	static void ProgressGUI(WWW www, string text) {
-		if (www != null && !www.isDone && string.IsNullOrEmpty(www.error)) {
-			EditorGUI.ProgressBar(EditorGUILayout.GetControlRect(), www.progress, 
-				string.IsNullOrEmpty(www.error) ? 
-					string.Format("{0} ({1}%) {2} kB",
-						text,
-						Mathf.RoundToInt(www.progress * 100f),
-						www.bytesDownloaded / 1024) :
-					string.Format("{0} ({1}%) {2} kB",
-						www.error,
-						Mathf.RoundToInt(www.progress * 100f))
-			);
 		}
 	}
 
-	void WaitGUI() {
-		GUILayout.FlexibleSpace();
-		GUILayout.BeginHorizontal();
-		GUILayout.FlexibleSpace();
-		GUILayout.Label("Wait...");
-		GUILayout.FlexibleSpace();
-		GUILayout.EndHorizontal();
-		GUILayout.FlexibleSpace();
-	}
+	#endregion
 
 }
