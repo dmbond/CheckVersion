@@ -32,6 +32,7 @@ public class HelpLastRelease : EditorWindow {
 	const string iniUrl = @"http://beta.unity3d.com/download/{0}/unity-{1}-{2}.ini";
 
 	const string finalRN = @"http://unity3d.com/unity/whats-new/unity-";
+	const string ltsRN = @"http://unity3d.com/unity/whatsnew/unity-";
 	const string betaRN = @"http://unity3d.com/unity/beta/unity";
 	const string patchRN = @"http://unity3d.com/unity/qa/patch-releases/";
 
@@ -474,10 +475,16 @@ public class HelpLastRelease : EditorWindow {
 		}
 		if (version.Contains("f")) {
 			versionDigits = version.Split('f')[0];
+			// RC
 			if (versionDigits.EndsWith("0") && repeat == false) {
 				url = betaRN + version;
 			} else {
-				url = finalRN + versionDigits;
+				// LTS
+				if (versionDigits.Contains(".4.") && versionDigits.Length > 7) {
+					url = ltsRN + versionDigits;
+				} else {
+					url = finalRN + versionDigits;
+				}
 			}
 		}
 		if (version.Contains("b")) {
