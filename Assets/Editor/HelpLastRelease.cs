@@ -499,6 +499,8 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void DownloadList(int historyNum, Action callback) {
+		hasTorrent = false;
+		hasReleaseNotes = false;
 		idxSelectedInCurrent = historyNum;
 		selectedVersion = currentList.Values[idxSelectedInCurrent].Split(' ')[0];
 		DownloadReleaseNotes(VersionToReleaseNotesUrl(selectedVersion));
@@ -526,11 +528,21 @@ public class HelpLastRelease : EditorWindow {
 		if (version.Contains("f")) {
 			versionDigits = version.Split('f')[0];
 			// RC
-			if (versionDigits.EndsWith("0") && repeat == false) {
-				url = betaRN + version;
+			if (versionDigits.EndsWith("0")) {
+				// old releases
+				if (versionDigits.StartsWith("5.3") || versionDigits.StartsWith("5.2") ||
+				    versionDigits.StartsWith("5.1") || versionDigits.StartsWith("5.0")) {
+					url = finalRN + versionDigits.Substring(0, 3);
+				} else {
+					if (repeat == false) {
+						url = betaRN + version;
+					} else {
+						url = finalRN + versionDigits;
+					}
+				}
 			} else {
-				// LTS
-				if (versionDigits.Contains(".4.") && versionDigits.Length > 7) {
+				// LTS or new Final
+				if ((versionDigits.Contains(".4.") && versionDigits.Length > 7) || repeat) {
 					url = ltsRN + versionDigits;
 				} else {
 					url = finalRN + versionDigits;
@@ -753,12 +765,31 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void ParseReleaseNotes(WWW www) {
-		if (!string.IsNullOrEmpty(www.error) || www.text.Contains("403</h1>") || www.text.Contains("404</h1>")) {
-			wwwReleaseNotes = null;
-			DownloadReleaseNotes(VersionToReleaseNotesUrl(selectedVersion, true));
+		bool err403 = www.text.Contains("403</h1>");
+		bool err404 = www.text.Contains("404</h1>");
+		if (!string.IsNullOrEmpty(www.error) || err403 || err404) {
+			if (selectedVersion.Contains("f")) {
+				string url = VersionToReleaseNotesUrl(selectedVersion, true);
+				if (url != www.url) {
+					DownloadReleaseNotes(url);
+				} else {
+					wwwReleaseNotes = null;
+				}
+			} else {
+				wwwReleaseNotes = null;
+			}
 		}
-		hasReleaseNotes = wwwReleaseNotes != null && string.IsNullOrEmpty(wwwReleaseNotes.error);
-		if (hasReleaseNotes) window.Repaint();
+		hasReleaseNotes = wwwReleaseNotes != null && string.IsNullOrEmpty(wwwReleaseNotes.error) && !err403 && !err404;
+		if (hasReleaseNotes) {
+			window.Repaint();
+			int idx = www.text.IndexOf("Revision: ");
+			if (idx != -1 && string.IsNullOrEmpty(selectedRevision)) {
+				selectedRevision = www.text.Substring(idx + 10, 12);
+				EditorPrefs.SetString(prefs + currentList.Keys[idxSelectedInCurrent], selectedRevision);
+				UpdateInfo();
+				window.Repaint();
+			}
+		}
 	}
 
 	static void ProcessTorrent(WWW www) {
