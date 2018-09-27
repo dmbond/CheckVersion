@@ -53,7 +53,7 @@ public class HelpLastRelease : EditorWindow {
 
 	#region Vars
 
-	#pragma warning disable 0649, 1635
+	#pragma warning disable 0649, 1635, 0618
 
 	[Serializable]
 	class GithubRelease {
@@ -95,7 +95,7 @@ public class HelpLastRelease : EditorWindow {
 	static bool hasLinux, hasReleaseNotes, hasTorrent;
 
 	static HelpLastRelease window;
-	static string wndTitle;
+	const string wndTitle = "Releases";
 	const string scriptName = "HelpLastRelease";
 	const string prefs = scriptName + ".";
 	const string prefsCount = prefs + "count";
@@ -117,14 +117,18 @@ public class HelpLastRelease : EditorWindow {
 	const string updateTooltip = "Update from Github";
 
 	static readonly Dictionary<string, Color> colors = new Dictionary<string, Color>() {
-		{ "2017.1.", Color.blue },
-		{ "2017.2.", Color.cyan },
-		{ "2017.3.", Color.magenta },
-		{ "2017.4.", Color.green },
-		{ "2018.1.", Color.yellow },
-		{ "2018.2.", Color.red },
-		{ "2018.3.", Color.red },
-		{ "2018.4.", Color.red }
+		{ "2017.1.", new Color(0f, 1f, 1f, 1f) },
+		{ "2017.2.", new Color(0f, 0f, 1f, 1f) },
+		{ "2017.3.", new Color(1f, 0f, 1f, 1f) },
+		{ "2017.4.", new Color(0f, 1f, 0f, 1f) },
+		{ "2018.1.", new Color(0.5f, 1f, 0.5f, 1f) },
+		{ "2018.2.", new Color(0f, 1f, 1f, 1f) },
+		{ "2018.3.", new Color(1f, 1f, 0f, 1f) },
+		{ "2018.4.", new Color(0f, 1f, 0f, 1f) },
+		{ "2019.1.", new Color(1f, 0.5f, 0.5f, 1f) },
+		{ "2019.2.", new Color(1f, 0.5f, 0.5f, 1f) },
+		{ "2019.3.", new Color(1f, 0f, 0f, 1f) },
+		{ "2019.4.", new Color(0f, 1f, 0f, 1f) }
 	};
 	static Color oldColor = Color.white;
 	static Color currentColor = Color.black;
@@ -248,6 +252,14 @@ public class HelpLastRelease : EditorWindow {
 	static void OpenNews() {
 		Application.OpenURL(newsUrl);
 	}
+	// ---
+
+	/*
+	[MenuItem("Help/Links/Clear...", false, 860)]
+	static void Clear() {
+		EditorPrefs.SetInt(prefsCount, 0);
+	}
+	*/
 
 	#endregion
 
@@ -463,7 +475,6 @@ public class HelpLastRelease : EditorWindow {
 
 	[InitializeOnLoadMethod]
 	static void AutoUpdate() {
-		wndTitle = string.Format("v {0}", Application.unityVersion);
 		colors.Add(Application.unityVersion, currentColor);
 		if (Application.internetReachability != NetworkReachability.NotReachable) {
 			DownloadGithub();
@@ -527,8 +538,9 @@ public class HelpLastRelease : EditorWindow {
 		}
 		if (version.Contains("f")) {
 			versionDigits = version.Split('f')[0];
+			var parts = versionDigits.Split('.');
 			// RC
-			if (versionDigits.EndsWith("0")) {
+			if (parts[2].StartsWith("0")) {
 				// old releases
 				if (versionDigits.StartsWith("5.3") || versionDigits.StartsWith("5.2") ||
 				    versionDigits.StartsWith("5.1") || versionDigits.StartsWith("5.0")) {
@@ -542,7 +554,7 @@ public class HelpLastRelease : EditorWindow {
 				}
 			} else {
 				// LTS or new Final
-				if ((versionDigits.Contains(".4.") && versionDigits.Length > 7) || repeat) {
+				if ((parts[1] == "4" && parts[0].Length == 4) || repeat) {
 					url = ltsRN + versionDigits;
 				} else {
 					url = finalRN + versionDigits;
@@ -553,6 +565,7 @@ public class HelpLastRelease : EditorWindow {
 			versionDigits = version.Split(' ')[0];
 			url = betaRN + versionDigits;
 		}
+		//Debug.LogFormat("RN url: {0}", url);
 		return url;
 	}
 
@@ -910,4 +923,5 @@ public class HelpLastRelease : EditorWindow {
 
 	#endregion
 
+	#pragma warning restore 0618
 }
