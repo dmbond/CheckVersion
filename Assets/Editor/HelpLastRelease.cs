@@ -34,7 +34,8 @@ public class HelpLastRelease : EditorWindow {
 
 	const string finalRN = @"http://unity3d.com/unity/whats-new/unity-";
 	const string ltsRN = @"http://unity3d.com/unity/whatsnew/unity-";
-	const string betaRN = @"http://unity3d.com/unity/beta/unity";
+	const string alphaRN = @"http://unity3d.com/unity/alpha/";
+	const string betaRN = @"http://unity3d.com/unity/beta/";
 	const string patchRN = @"http://unity3d.com/unity/qa/patch-releases/";
 
 	const string tutorialsUrl = @"http://unity3d.com/learn/tutorials";
@@ -530,7 +531,8 @@ public class HelpLastRelease : EditorWindow {
 		string url = null;
 		string versionDigits;
 		if (version.Contains("a")) {
-			url = betaRN;
+			versionDigits = version.Split(' ')[0];
+			url = alphaRN + versionDigits;
 		}
 		if (version.Contains("p")) {
 			versionDigits = version.Split(' ')[0];
@@ -563,7 +565,11 @@ public class HelpLastRelease : EditorWindow {
 		}
 		if (version.Contains("b")) {
 			versionDigits = version.Split(' ')[0];
-			url = betaRN + versionDigits;
+			if (repeat == false) {
+				url = betaRN + versionDigits;
+			} else {
+				url = string.Format("{0}unity{1}", betaRN, versionDigits);
+			}
 		}
 		//Debug.LogFormat("RN url: {0}", url);
 		return url;
@@ -675,7 +681,12 @@ public class HelpLastRelease : EditorWindow {
 			if (string.IsNullOrEmpty(www.error) && www.bytesDownloaded > 0) {
 				//Debug.LogFormat("{0} kB: {1}", www.size/1024, www.url);
 				if (action != null) action(www);
-			} //else Debug.LogWarningFormat("{0} {1}", www.url, www.error);
+			} else {
+				if (www.error.StartsWith("403") || www.error.StartsWith("404")) {
+					if (action != null) action(www);
+				}
+				//Debug.LogWarningFormat("{0} {1}", www.url, www.error);
+			}
 		}
 	}
 
@@ -778,10 +789,10 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void ParseReleaseNotes(WWW www) {
-		bool err403 = www.text.Contains("403</h1>");
-		bool err404 = www.text.Contains("404</h1>");
+		bool err403 = www.text.Contains("403</h1>") || (!string.IsNullOrEmpty(www.error) && www.error.StartsWith("403"));
+		bool err404 = www.text.Contains("404</h1>") || (!string.IsNullOrEmpty(www.error) && www.error.StartsWith("404"));
 		if (!string.IsNullOrEmpty(www.error) || err403 || err404) {
-			if (selectedVersion.Contains("f")) {
+			if (selectedVersion.Contains("f") || selectedVersion.Contains("b")) {
 				string url = VersionToReleaseNotesUrl(selectedVersion, true);
 				if (url != www.url) {
 					DownloadReleaseNotes(url);
