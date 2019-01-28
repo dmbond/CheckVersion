@@ -37,6 +37,7 @@ public class HelpLastRelease : EditorWindow {
 	const string alphaRN = @"http://unity3d.com/unity/alpha/";
 	const string betaRN = @"http://unity3d.com/unity/beta/";
 	const string patchRN = @"http://unity3d.com/unity/qa/patch-releases/";
+	const string newFinalRN = @"http://unity3d.com/unity/whats-new/";
 
 	const string tutorialsUrl = @"http://unity3d.com/learn/tutorials";
 	const string knowledgeBaseUrl = @"http://support.unity3d.com";
@@ -118,8 +119,8 @@ public class HelpLastRelease : EditorWindow {
 	const string updateTooltip = "Update from Github";
 
 	static readonly Dictionary<string, Color> colors = new Dictionary<string, Color>() {
-		{ "2017.1.", new Color(0f, 1f, 1f, 1f) },
-		{ "2017.2.", new Color(0f, 0f, 1f, 1f) },
+		{ "2017.1.", new Color(0f, 0.5f, 1f, 1f) },
+		{ "2017.2.", new Color(1f, 0.5f, 1f, 1f) },
 		{ "2017.3.", new Color(1f, 0f, 1f, 1f) },
 		{ "2017.4.", new Color(0f, 1f, 0f, 1f) },
 		{ "2018.1.", new Color(0.5f, 1f, 0.5f, 1f) },
@@ -135,6 +136,7 @@ public class HelpLastRelease : EditorWindow {
 	static Color currentColor = Color.black;
 	static float alphaBackForPersonal = 0.3f;
 	static Color alpha = new Color(1f, 1f, 1f, alphaBackForPersonal);
+	static int repeatRN = 0;
 
 	#endregion
 
@@ -514,6 +516,7 @@ public class HelpLastRelease : EditorWindow {
 		hasTorrent = false;
 		hasReleaseNotes = false;
 		idxSelectedInCurrent = historyNum;
+		repeatRN = 0;
 		selectedVersion = currentList.Values[idxSelectedInCurrent].Split(' ')[0];
 		DownloadReleaseNotes(VersionToReleaseNotesUrl(selectedVersion));
 		selectedRevision = EditorPrefs.GetString(prefs + currentList.Keys[idxSelectedInCurrent], "");
@@ -527,7 +530,7 @@ public class HelpLastRelease : EditorWindow {
 		}
 	}
 
-	static string VersionToReleaseNotesUrl(string version, bool repeat = false) {
+	static string VersionToReleaseNotesUrl(string version, int repeat = 0) {
 		string url = null;
 		string versionDigits;
 		if (version.Contains("a")) {
@@ -548,7 +551,7 @@ public class HelpLastRelease : EditorWindow {
 				    versionDigits.StartsWith("5.1") || versionDigits.StartsWith("5.0")) {
 					url = finalRN + versionDigits.Substring(0, 3);
 				} else {
-					if (repeat == false) {
+					if (repeat == 0) {
 						url = betaRN + version;
 					} else {
 						url = finalRN + versionDigits;
@@ -556,22 +559,28 @@ public class HelpLastRelease : EditorWindow {
 				}
 			} else {
 				// LTS or new Final
-				if ((parts[1] == "4" && parts[0].Length == 4) || repeat) {
-					url = ltsRN + versionDigits;
-				} else {
-					url = finalRN + versionDigits;
+				switch (repeat) {
+					case 0:
+						url = finalRN + versionDigits;
+						break;
+					case 1:
+						url = ltsRN + versionDigits;
+						break;
+					case 2:
+						url = newFinalRN + versionDigits;
+						break;
 				}
 			}
 		}
 		if (version.Contains("b")) {
 			versionDigits = version.Split(' ')[0];
-			if (repeat == false) {
+			if (repeat == 0) {
 				url = betaRN + versionDigits;
 			} else {
 				url = string.Format("{0}unity{1}", betaRN, versionDigits);
 			}
 		}
-		//Debug.LogFormat("RN url: {0}", url);
+		//Debug.LogFormat("RN url[{1}]: {0}", url, repeat);
 		return url;
 	}
 
@@ -792,13 +801,10 @@ public class HelpLastRelease : EditorWindow {
 		bool err403 = www.text.Contains("403</h1>") || (!string.IsNullOrEmpty(www.error) && www.error.StartsWith("403"));
 		bool err404 = www.text.Contains("404</h1>") || (!string.IsNullOrEmpty(www.error) && www.error.StartsWith("404"));
 		if (!string.IsNullOrEmpty(www.error) || err403 || err404) {
-			if (selectedVersion.Contains("f") || selectedVersion.Contains("b")) {
-				string url = VersionToReleaseNotesUrl(selectedVersion, true);
-				if (url != www.url) {
-					DownloadReleaseNotes(url);
-				} else {
-					wwwReleaseNotes = null;
-				}
+			if (selectedVersion.Contains("f") || selectedVersion.Contains("b") && repeatRN < 2) {
+				repeatRN++;
+				string url = VersionToReleaseNotesUrl(selectedVersion, repeatRN);
+				DownloadReleaseNotes(url);
 			} else {
 				wwwReleaseNotes = null;
 			}
