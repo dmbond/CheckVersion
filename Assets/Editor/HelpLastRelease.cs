@@ -801,7 +801,7 @@ public class HelpLastRelease : EditorWindow {
 		bool err403 = www.text.Contains("403</h1>") || (!string.IsNullOrEmpty(www.error) && www.error.StartsWith("403"));
 		bool err404 = www.text.Contains("404</h1>") || (!string.IsNullOrEmpty(www.error) && www.error.StartsWith("404"));
 		if (!string.IsNullOrEmpty(www.error) || err403 || err404) {
-			if (selectedVersion.Contains("f") || selectedVersion.Contains("b") && repeatRN < 2) {
+			if ((selectedVersion.Contains("f") || selectedVersion.Contains("b")) && repeatRN < 2) {
 				repeatRN++;
 				string url = VersionToReleaseNotesUrl(selectedVersion, repeatRN);
 				DownloadReleaseNotes(url);
