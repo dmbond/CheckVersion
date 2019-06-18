@@ -31,6 +31,7 @@ public class HelpLastRelease : EditorWindow {
 	const string serverUrl = @"http://symbolserver.unity3d.com/";
 	const string historyUrl = serverUrl + @"000Admin/history.txt";
 	const string iniUrl = @"http://beta.unity3d.com/download/{0}/unity-{1}-{2}.ini";
+    const string jsonUrl = @"https://public-cdn.cloud.unity3d.com/hub/prod/releases-{0}.json";
 
 	const string finalRN = @"http://unity3d.com/unity/whats-new/unity-";
 	const string ltsRN = @"http://unity3d.com/unity/whatsnew/unity-";
@@ -39,15 +40,14 @@ public class HelpLastRelease : EditorWindow {
 	const string patchRN = @"http://unity3d.com/unity/qa/patch-releases/";
 	const string newFinalRN = @"http://unity3d.com/unity/whats-new/";
 
-	const string tutorialsUrl = @"http://unity3d.com/learn/tutorials";
 	const string knowledgeBaseUrl = @"http://support.unity3d.com";
 	const string customerServiceUrl = @"http://support.unity3d.com/hc/en-us/requests/new?ticket_form_id=65905";
-	const string liveTrainingUrl = @"http://unity3d.com/learn/live-training";
-	const string faqUrl = @"https://unity3d.com/unity/faq";
+	const string learnUrl = @"http://learn.unity3d.com/";
+	const string faqUrl = @"http://unity3d.com/unity/faq";
 
 	const string githubUTUrl = @"http://github.com/Unity-Technologies";
 	const string bitbucketUTUrl = @"http://bitbucket.org/Unity-Technologies";
-	const string newsUrl = @"http://unity_news.tggram.com";
+	const string newsUrl = @"http://t.me/s/unity_news";
 
 	const string githubUrl = @"http://api.github.com/repos/dmbond/CheckVersion/releases/latest";
 
@@ -55,7 +55,7 @@ public class HelpLastRelease : EditorWindow {
 
 	#region Vars
 
-	#pragma warning disable 0649, 1635, 0618
+	#pragma warning disable 0414, 0649, 1635, 0618
 
 	[Serializable]
 	class GithubRelease {
@@ -70,7 +70,28 @@ public class HelpLastRelease : EditorWindow {
 		public string browser_download_url;
 	}
 
-	#pragma warning restore 0649, 1635
+    [Serializable]
+    class JsonOS {
+        public JsonRelease[] official;
+        public JsonRelease[] beta;
+    }
+
+    [Serializable]
+    class JsonRelease {
+        public string version;
+        public bool lts;
+        public string downloadUrl;
+        public JsonModule[] modules;
+    }
+
+    [Serializable]
+    class JsonModule {
+        public string name;
+        public string description;
+        public string downloadUrl;
+    }
+
+    #pragma warning restore 0649, 1635
 
 	static readonly string zipName = Application.platform == RuntimePlatform.WindowsEditor ? "7z" : "7za";
 	const string baseName = "UnityYAMLMerge.ex";
@@ -81,11 +102,13 @@ public class HelpLastRelease : EditorWindow {
 	static WWW wwwHistory, wwwList, wwwMerger, wwwAssistant;
 	static WWW wwwGithub, wwwPackage;
 	static WWW wwwIniWin, wwwIniOSX, wwwIniLinux;
+	static WWW wwwJsonWin, wwwJsonOSX, wwwJsonLinux;
 	static WWW wwwReleaseNotes, wwwTorrent;
 
-	static SortedList<string, string> fullList, sortedList, currentList;
+	static SortedList<string, string> fullList, sortedList, currentList, officialList;
 
 	static int idxSelectedInCurrent = -1;
+    static bool officialShow = false;
 	static string selectedVersion;
 	static string selectedRevision;
 	static Action ReleaseCallback;
@@ -94,6 +117,8 @@ public class HelpLastRelease : EditorWindow {
 	static readonly string[] titlesOS = { "Win", "OSX" };
 	static readonly string[] titlesOSLinux = { "Win", "OSX", "Linux" };
 	static Dictionary<string, Dictionary<string, string>> dictIniWin, dictIniOSX, dictIniLinux;
+    static Dictionary<int, JsonRelease> dictJsonWin, dictJsonOSX, dictJsonLinux;
+    static JsonOS jsonWin, jsonOSX, jsonLinux;
 	static bool hasLinux, hasReleaseNotes, hasTorrent;
 
 	static HelpLastRelease window;
@@ -117,6 +142,8 @@ public class HelpLastRelease : EditorWindow {
 	const string versionTooltip = "Open Download Page";
 	const string infoTooltip = "Show more info";
 	const string updateTooltip = "Update from Github";
+	const string editorTooltip = "Unity Editor for building your games";
+	const string copiedNotif = "URL copied to the clipboard";
 
 	static readonly Dictionary<string, Color> colors = new Dictionary<string, Color>() {
 		{ "2017.1.", new Color(0f, 0.5f, 1f, 1f) },
@@ -127,7 +154,7 @@ public class HelpLastRelease : EditorWindow {
 		{ "2018.2.", new Color(0f, 1f, 1f, 1f) },
 		{ "2018.3.", new Color(1f, 1f, 0f, 1f) },
 		{ "2018.4.", new Color(0f, 1f, 0f, 1f) },
-		{ "2019.1.", new Color(1f, 0.5f, 0.5f, 1f) },
+		{ "2019.1.", new Color(0.5f, 1f, 0.5f, 1f) },
 		{ "2019.2.", new Color(1f, 0.5f, 0.5f, 1f) },
 		{ "2019.3.", new Color(1f, 0f, 0f, 1f) },
 		{ "2019.4.", new Color(0f, 1f, 0f, 1f) }
@@ -144,17 +171,44 @@ public class HelpLastRelease : EditorWindow {
 
 	[MenuItem("Help/Links/Releases...", false, 010)]
 	static void Init() {
+        officialShow = false;
+        currentList = null;
 		window = GetWindow<HelpLastRelease>(wndTitle);
 		SortList(String.Empty);
 	}
 
 	[MenuItem("Help/Links/Check for Updates...", false, 015)]
 	static void CheckforUpdates() {
+        officialShow = false;
+        currentList = null;
 		window = GetWindow<HelpLastRelease>(wndTitle);
 		int index = Application.unityVersion.LastIndexOf('.');
 		string filter = Application.unityVersion.Substring(0, index + 1);
 		SortList(filter);
 	}
+
+	[MenuItem("Help/Links/Official...", false, 020)]
+	static void JsonFromHub() {
+        officialShow = true;
+        currentList = null;
+		window = GetWindow<HelpLastRelease>(wndTitle);
+        int counter = 0;
+        officialList = new SortedList<string, string>();
+        dictJsonWin = new Dictionary<int, JsonRelease>();
+        dictJsonOSX = new Dictionary<int, JsonRelease>();
+        for (int i = 0; i < jsonWin.official.Length; i++) {
+            officialList.Add(counter.ToString(), jsonWin.official[i].version);
+            dictJsonWin.Add(counter, jsonWin.official[i]);
+            dictJsonOSX.Add(counter, jsonOSX.official[i]);
+            counter++;
+        }
+        for (int i = 0; i < jsonWin.beta.Length; i++) {
+            officialList.Add(counter.ToString(), jsonWin.beta[i].version);
+            dictJsonWin.Add(counter, jsonWin.beta[i]);
+            dictJsonOSX.Add(counter, jsonOSX.beta[i]);
+            counter++;
+        }
+    }
 	// ---
 
 	[MenuItem("Help/Links/Search...", false, 100)]
@@ -199,11 +253,6 @@ public class HelpLastRelease : EditorWindow {
 	}
 	// ---
 
-	[MenuItem("Help/Links/Tutorials...", false, 700)]
-	static void OpenBestPractices() {
-		Application.OpenURL(tutorialsUrl);
-	}
-
 	[MenuItem("Help/Links/Knowledge Base...", false, 705)]
 	static void OpenKnowledgeBase() {
 		Application.OpenURL(knowledgeBaseUrl);
@@ -214,9 +263,9 @@ public class HelpLastRelease : EditorWindow {
 		Application.OpenURL(customerServiceUrl);
 	}
 
-	[MenuItem("Help/Links/Live Training...", false, 710)]
+	[MenuItem("Help/Links/Learn...", false, 710)]
 	static void OpenLiveTraining() {
-		Application.OpenURL(liveTrainingUrl);
+		Application.OpenURL(learnUrl);
 	}
 
 	[MenuItem("Help/Links/FAQ...", false, 715)]
@@ -269,7 +318,7 @@ public class HelpLastRelease : EditorWindow {
 	#region GUI
 
 	void OnGUI() {
-		if (fullList != null) {
+		if (fullList != null || officialList != null) {
 			GUILayout.BeginHorizontal();
 			ListGUI();
 			InfoGUI();
@@ -284,7 +333,7 @@ public class HelpLastRelease : EditorWindow {
 		GUILayout.BeginVertical(GUILayout.Width(210));
 		SearchVersionGUI();
 		scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false);
-		if (currentList == null) currentList = fullList;
+		if (currentList == null) currentList = officialShow ? officialList : fullList;
 		for (int i = currentList.Count - 1; i >= 0; i--) {
 			GUILayout.BeginHorizontal();
 			ColorGUI(i);
@@ -292,11 +341,11 @@ public class HelpLastRelease : EditorWindow {
 			#if UNITY_5_5_OR_NEWER
 			if (Application.platform != RuntimePlatform.LinuxEditor)			
 			#endif
-			if (GUILayout.Button(new GUIContent("A", assistTooltip), btnStyle)) {
+			if (GUILayout.Button(new GUIContent("A", assistTooltip), btnStyle, GUILayout.Width(23f))) {
 				DownloadList(i, DownloadAssistant);
 			}
 			btnStyle.alignment = TextAnchor.MiddleLeft;
-			if (GUILayout.Button(new GUIContent(currentList.Values[i], infoTooltip), btnStyle, GUILayout.MinWidth(160f))) {
+			if (GUILayout.Button(new GUIContent(currentList.Values[i], infoTooltip), btnStyle, GUILayout.Width(160f))) {
 				DownloadList(i, UpdateInfo);
 			}
 			GUILayout.EndHorizontal();
@@ -348,39 +397,71 @@ public class HelpLastRelease : EditorWindow {
 			StartTorrent();
 		}
 		GUILayout.EndHorizontal();
-		Dictionary<string, Dictionary<string, string>> dict = null;
-		if (!string.IsNullOrEmpty(selectedRevision)) {
-			GUILayout.BeginHorizontal();
-			idxOS = GUILayout.SelectionGrid(idxOS, hasLinux ? titlesOSLinux : titlesOS, hasLinux ? 3 : 2,
-				btnStyle);
-			switch (idxOS) {
-				case 0:
-					dict = dictIniWin;
-					break;
-				case 1:
-					dict = dictIniOSX;
-					break;
-				case 2:
-					dict = dictIniLinux;
-					break;
-			}
-			GUILayout.EndHorizontal();
-		}
-		if (dict != null) {
-			GUILayout.BeginVertical();
-			GUILayout.Space(5f);
-			btnStyle.alignment = TextAnchor.MiddleLeft;
-			foreach (var key in dict.Keys) {
-				if (GUILayout.Button(new GUIContent(dict[key]["title"], dict[key]["description"]), btnStyle)) {
-					var url = dict[key]["url"].StartsWith("http") ? dict[key]["url"] :
-						string.Format(releaseUrlBeta, selectedRevision, dict[key]["url"]);
-					EditorGUIUtility.systemCopyBuffer = url;
-					ShowNotification(new GUIContent("URL copied to the clipboard"));
-				}
-			}
-			GUILayout.EndVertical();
-		}
-		GUILayout.EndVertical();
+        if (officialShow) {
+            idxOS = GUILayout.SelectionGrid(idxOS, titlesOS, 2, btnStyle);
+            JsonRelease release = null;
+            switch (idxOS) {
+                case 0:
+                    release = dictJsonWin[idxSelectedInCurrent];
+                    break;
+                case 1:
+                    release = dictJsonOSX[idxSelectedInCurrent];
+                    break;
+            }
+            if (release != null) {
+                GUILayout.BeginVertical();
+                GUILayout.Space(5f);
+                btnStyle.alignment = TextAnchor.MiddleLeft;
+                if (GUILayout.Button(
+                    new GUIContent(string.Format("Unity {0}", release.version), editorTooltip), btnStyle)) {
+                    EditorGUIUtility.systemCopyBuffer = release.downloadUrl;
+                    ShowNotification(new GUIContent(copiedNotif));
+                }
+                if (release.modules != null) {
+                    for (int i = 0; i < release.modules.Length; i++) {
+                        if (GUILayout.Button(
+                            new GUIContent(release.modules[i].name, release.modules[i].description), btnStyle)) {
+                            EditorGUIUtility.systemCopyBuffer = release.modules[i].downloadUrl;
+                            ShowNotification(new GUIContent(copiedNotif));
+                        }
+                    }
+                }
+                GUILayout.EndVertical();
+            }
+        } else {
+            Dictionary<string, Dictionary<string, string>> dict = null;
+            if (!string.IsNullOrEmpty(selectedRevision)) {
+                idxOS = GUILayout.SelectionGrid(idxOS, hasLinux ? titlesOSLinux : titlesOS, hasLinux ? 3 : 2, btnStyle);
+                switch (idxOS) {
+                    case 0:
+                        dict = dictIniWin;
+                        break;
+                    case 1:
+                        dict = dictIniOSX;
+                        break;
+                    case 2:
+                        dict = dictIniLinux;
+                        break;
+                }
+            }
+            if (dict != null) {
+                GUILayout.BeginVertical();
+                GUILayout.Space(5f);
+                btnStyle.alignment = TextAnchor.MiddleLeft;
+                foreach (var key in dict.Keys) {
+                    if (GUILayout.Button(
+                        new GUIContent(dict[key]["title"], dict[key]["description"]), btnStyle)) {
+                        var url = dict[key]["url"].StartsWith("http")
+                            ? dict[key]["url"]
+                            : string.Format(releaseUrlBeta, selectedRevision, dict[key]["url"]);
+                        EditorGUIUtility.systemCopyBuffer = url;
+                        ShowNotification(new GUIContent(copiedNotif));
+                    }
+                }
+                GUILayout.EndVertical();
+            }
+        }
+        GUILayout.EndVertical();
 	}
 
 	void ColorGUI(int i) {
@@ -430,15 +511,16 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	static void SortList(string filter) {
-		if (!string.IsNullOrEmpty(filter) && fullList != null) {
+        var tempList = officialShow ? officialList : fullList;
+		if (!string.IsNullOrEmpty(filter) && tempList != null) {
 			sortedList = new SortedList<string, string>();
-			for (int i = fullList.Count - 1; i >= 0; i--) {
-				if (fullList.Values[i].Contains(filter)) {
-					sortedList.Add(fullList.Keys[i], fullList.Values[i]);
+			for (int i = tempList.Count - 1; i >= 0; i--) {
+				if (tempList.Values[i].Contains(filter)) {
+					sortedList.Add(tempList.Keys[i], tempList.Values[i]);
 				}
 			}
 			currentList = sortedList;
-		} else currentList = fullList;
+		} else currentList = tempList;
 		filterString = filter;
 	}
 
@@ -473,14 +555,17 @@ public class HelpLastRelease : EditorWindow {
 
 	void OnEnable() {
 		tempDir = SetTempDir();
-		DownloadHistory();
-	}
+        if (Application.internetReachability != NetworkReachability.NotReachable) {
+            DownloadHistory();
+        }
+    }
 
 	[InitializeOnLoadMethod]
 	static void AutoUpdate() {
 		colors.Add(Application.unityVersion, currentColor);
 		if (Application.internetReachability != NetworkReachability.NotReachable) {
 			DownloadGithub();
+            UpdateJsonInfo();
 		}
 	}
 
@@ -492,11 +577,19 @@ public class HelpLastRelease : EditorWindow {
 		idxOS = Application.platform == RuntimePlatform.WindowsEditor ? 0 : 1;
 		window.Repaint();
 		if (!string.IsNullOrEmpty(selectedRevision)) {
-			DownloadIniWin(selectedRevision, selectedVersion);
-			DownloadIniOSX(selectedRevision, selectedVersion);
-			DownloadIniLinux(selectedRevision, selectedVersion);
-			DownloadTorrent(selectedRevision, selectedVersion);
+            if (!officialShow) {
+                DownloadIniWin(selectedRevision, selectedVersion);
+                DownloadIniOSX(selectedRevision, selectedVersion);
+                DownloadIniLinux(selectedRevision, selectedVersion);
+            }
+            DownloadTorrent(selectedRevision, selectedVersion);
 		}
+	}
+    
+    static void UpdateJsonInfo() {
+		DownloadJsonWin();
+		DownloadJsonOSX();
+		DownloadJsonLinux();
 	}
 
 	static void DownloadAssistant() {
@@ -519,16 +612,21 @@ public class HelpLastRelease : EditorWindow {
 		repeatRN = 0;
 		selectedVersion = currentList.Values[idxSelectedInCurrent].Split(' ')[0];
 		DownloadReleaseNotes(VersionToReleaseNotesUrl(selectedVersion));
-		selectedRevision = EditorPrefs.GetString(prefs + currentList.Keys[idxSelectedInCurrent], "");
-		if (!string.IsNullOrEmpty(selectedRevision)) {
-			if (callback != null) callback();
-		} else {
-			ReleaseCallback = callback;
-			string listUrl = string.Format("{0}000Admin/{1}", serverUrl, currentList.Keys[idxSelectedInCurrent]);
-			wwwList = new WWW(listUrl);
-			EditorApplication.update += WaitList;
-		}
-	}
+        if (officialShow) {
+            selectedRevision = dictJsonWin[idxSelectedInCurrent].downloadUrl.Split('/')[4];
+            if (callback != null) callback();
+        } else {
+            selectedRevision = EditorPrefs.GetString(prefs + currentList.Keys[idxSelectedInCurrent], "");
+            if (!string.IsNullOrEmpty(selectedRevision)) {
+                if (callback != null) callback();
+            } else {
+                ReleaseCallback = callback;
+                string listUrl = string.Format("{0}000Admin/{1}", serverUrl, currentList.Keys[idxSelectedInCurrent]);
+                wwwList = new WWW(listUrl);
+                EditorApplication.update += WaitList;
+            }
+        }
+    }
 
 	static string VersionToReleaseNotesUrl(string version, int repeat = 0) {
 		string url = null;
@@ -636,6 +734,27 @@ public class HelpLastRelease : EditorWindow {
 		EditorApplication.update += WaitGithub;
 	}
 
+    static void DownloadJsonWin() {
+        jsonWin = null;
+        string url = String.Format(jsonUrl, "win32");
+        wwwJsonWin = new WWW(url);
+        EditorApplication.update += WaitJsonWin;
+    }
+
+    static void DownloadJsonOSX() {
+        jsonOSX = null;
+        string url = String.Format(jsonUrl, "darwin");
+        wwwJsonOSX = new WWW(url);
+        EditorApplication.update += WaitJsonOSX;
+    }
+
+    static void DownloadJsonLinux() {
+        jsonLinux = null;
+        string url = String.Format(jsonUrl, "linux");
+        wwwJsonLinux = new WWW(url);
+        EditorApplication.update += WaitJsonLinux;
+    }
+
 	#endregion
 
 	#region Wait
@@ -683,6 +802,18 @@ public class HelpLastRelease : EditorWindow {
 	static void WaitPackage() {
 		Wait(wwwPackage, WaitPackage, ImportPackage);
 	}
+
+    static void WaitJsonWin() {
+        Wait(wwwJsonWin, WaitJsonWin, ParseJsonWin);
+    }
+
+    static void WaitJsonOSX() {
+        Wait(wwwJsonOSX, WaitJsonOSX, ParseJsonOSX);
+    }
+
+    static void WaitJsonLinux() {
+        Wait(wwwJsonLinux, WaitJsonLinux, ParseJsonLinux);
+    }
 
 	static void Wait(WWW www, EditorApplication.CallbackFunction caller, Action<WWW> action) {
 		if (www != null && www.isDone) {
@@ -938,7 +1069,23 @@ public class HelpLastRelease : EditorWindow {
 		}
 	}
 
+    static void ParseJsonWin(WWW json) {
+        ParseJson(json, out jsonWin);
+    }
+
+    static void ParseJsonOSX(WWW json) {
+        ParseJson(json, out jsonOSX);
+    }
+
+    static void ParseJsonLinux(WWW json) {
+        ParseJson(json, out jsonLinux);
+    }
+
+    static void ParseJson(WWW jsonWWW, out JsonOS jsonOS) {
+        jsonOS = JsonUtility.FromJson<JsonOS>(jsonWWW.text);
+    }
+
 	#endregion
 
-	#pragma warning restore 0618
+	#pragma warning restore 0414, 0618
 }

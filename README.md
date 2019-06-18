@@ -12,6 +12,9 @@ Show builds for current branch
 
 ![Screenshot](https://user-images.githubusercontent.com/15363149/38339707-58f0bf0c-3878-11e8-9b4a-54edbe3e6db6.png "Screenshot")
 
+###### Help > Links > Official...
+Show builds from the official channel (as Unity Hub)
+
 ###### Help > Links > Search...
 Open Unity Site Search (slow) http://unity3d.com/search
 
@@ -38,17 +41,14 @@ Open Unity beta archive http://unity3d.com/unity/beta/archive
 Open Unity patch archive http://unity3d.com/unity/qa/patch-releases
 
 
-###### Help > Links > Tutorials...
-Open Tutorials (Projects and Topics) http://unity3d.com/learn/tutorials
-
 ###### Help > Links > Knowledge Base...
 Open Knowledge Base http://support.unity3d.com
 
 ###### Help > Links > Customer Service...
 Open Customer Service Form http://support.unity3d.com/hc/en-us/requests/new?ticket_form_id=65905
 
-###### Help > Links > Live Training...
-Open Live online training courses http://unity3d.com/learn/live-training
+###### Help > Links > Learn...
+Open Learn portal (projects, courses, tutorials) http://learn.unity.com
 
 ###### Help > Links > FAQ...
 Open Unity FAQ https://unity3d.com/unity/faq
@@ -71,7 +71,7 @@ Open Github Unity Technologies http://github.com/Unity-Technologies
 Open Bitbucket Unity Technologies http://bitbucket.org/Unity-Technologies
 
 ###### Help > Links > News...
-Open web version telegram channel @unity_news http://unity_news.tggram.com
+Open web version telegram channel @unity_news http://t.me/s/unity_news
 
 
 **RSS** Unity Builds Feed http://rss.uphero.com/rss/rss.php
