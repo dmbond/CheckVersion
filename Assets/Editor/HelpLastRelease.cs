@@ -173,6 +173,7 @@ public class HelpLastRelease : EditorWindow {
 	static void Init() {
         officialShow = false;
         currentList = null;
+        idxSelectedInCurrent = -1;
 		window = GetWindow<HelpLastRelease>(wndTitle);
 		SortList(String.Empty);
 	}
@@ -181,6 +182,7 @@ public class HelpLastRelease : EditorWindow {
 	static void CheckforUpdates() {
         officialShow = false;
         currentList = null;
+        idxSelectedInCurrent = -1;
 		window = GetWindow<HelpLastRelease>(wndTitle);
 		int index = Application.unityVersion.LastIndexOf('.');
 		string filter = Application.unityVersion.Substring(0, index + 1);
@@ -191,6 +193,7 @@ public class HelpLastRelease : EditorWindow {
 	static void JsonFromHub() {
         officialShow = true;
         currentList = null;
+        idxSelectedInCurrent = -1;
 		window = GetWindow<HelpLastRelease>(wndTitle);
         int counter = 0;
         officialList = new SortedList<string, string>();
@@ -306,12 +309,13 @@ public class HelpLastRelease : EditorWindow {
 	}
 	// ---
 
-	/*
+    /*
 	[MenuItem("Help/Links/Clear...", false, 860)]
 	static void Clear() {
-		EditorPrefs.SetInt(prefsCount, 0);
+		//EditorPrefs.SetInt(prefsCount, 0);
+        EditorPrefs.SetString(prefs + Application.productName, nullDT);
 	}
-	*/
+    */
 
 	#endregion
 
@@ -402,10 +406,10 @@ public class HelpLastRelease : EditorWindow {
             JsonRelease release = null;
             switch (idxOS) {
                 case 0:
-                    release = dictJsonWin[idxSelectedInCurrent];
+                    release = dictJsonWin != null ? dictJsonWin[idxSelectedInCurrent] : null;
                     break;
                 case 1:
-                    release = dictJsonOSX[idxSelectedInCurrent];
+                    release = dictJsonOSX != null ? dictJsonOSX[idxSelectedInCurrent] : null;
                     break;
             }
             if (release != null) {
