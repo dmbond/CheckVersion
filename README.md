@@ -1,16 +1,25 @@
 # CheckVersion
 Checks for Unity updates
 
-![Screenshot](https://user-images.githubusercontent.com/15363149/38339052-f46334a0-3874-11e8-877c-d140a307896c.png "Screenshot")
+![Screenshot](https://user-images.githubusercontent.com/15363149/66247436-2742b480-e725-11e9-803d-7cc57c21397d.png "Screenshot")
 
 ###### Help > Links > Releases...
+- The top search box filters the list (it can also be used to insert a revision number and display information about it)
 - **A** launch Download Assistant for selected release
 - button with version show info about selected release
+- **Update is available** updates this utility to the latest version from GitHub
+
+Right (Info) panel
+- Button with version and revision number opens the download page
+- **Release Notes** opens the corresponding page
+- **Torrent** downloads and launch a torrent file
+- **Win**, **OSX**, **Linux** toggle the bottom list of components to download
+- Clicking on the component button copies the download link to the clipboard (for example, for downloading via the download manager)
 
 ###### Help > Links > Check for Updates...
-Show builds for current branch
+Show (filter) builds for current branch. The current version is highlighted.
 
-![Screenshot](https://user-images.githubusercontent.com/15363149/38339707-58f0bf0c-3878-11e8-9b4a-54edbe3e6db6.png "Screenshot")
+![Screenshot](https://user-images.githubusercontent.com/15363149/66247463-86a0c480-e725-11e9-9b96-9fd78a928dbf.png "Screenshot")
 
 ###### Help > Links > Official...
 Show builds from the official channel (as Unity Hub)

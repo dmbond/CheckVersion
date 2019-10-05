@@ -31,6 +31,7 @@ public class HelpLastRelease : EditorWindow {
 	const string serverUrl = @"http://symbolserver.unity3d.com/";
 	const string historyUrl = serverUrl + @"000Admin/history.txt";
 	const string iniUrl = @"http://beta.unity3d.com/download/{0}/unity-{1}-{2}.ini";
+    const string htmlUrl = @"http://beta.unity3d.com/download/{0}/download.html";
     const string jsonUrl = @"https://public-cdn.cloud.unity3d.com/hub/prod/releases-{0}.json";
 
 	const string finalRN = @"http://unity3d.com/unity/whats-new/unity-";
@@ -103,7 +104,7 @@ public class HelpLastRelease : EditorWindow {
 	static WWW wwwGithub, wwwPackage;
 	static WWW wwwIniWin, wwwIniOSX, wwwIniLinux;
 	static WWW wwwJsonWin, wwwJsonOSX, wwwJsonLinux;
-	static WWW wwwReleaseNotes, wwwTorrent;
+	static WWW wwwReleaseNotes, wwwTorrent, wwwHtml;
 
 	static SortedList<string, string> fullList, sortedList, currentList, officialList;
 
@@ -380,7 +381,7 @@ public class HelpLastRelease : EditorWindow {
 	}
 
 	void InfoGUI() {
-		if (idxSelectedInCurrent == -1) return;
+		if (idxSelectedInCurrent == -1 && (string.IsNullOrEmpty(selectedVersion) || string.IsNullOrEmpty(selectedRevision))) return;
 		if (EditorGUIUtility.isProSkin) {
 			GUI.contentColor = oldColor;
 		} else {
@@ -402,7 +403,7 @@ public class HelpLastRelease : EditorWindow {
 			StartTorrent();
 		}
 		GUILayout.EndHorizontal();
-        if (officialShow) {
+        if (officialShow && !IsRevision(filterString)) {
             idxOS = GUILayout.SelectionGrid(idxOS, titlesOS, 2, btnStyle);
             JsonRelease release = null;
             switch (idxOS) {
@@ -485,15 +486,36 @@ public class HelpLastRelease : EditorWindow {
 		string s = string.Empty;
 		GUILayout.BeginHorizontal(GUI.skin.FindStyle("Toolbar"));
 		s = GUILayout.TextField(filterString, GUI.skin.FindStyle("ToolbarSeachTextField"));
-		if (GUILayout.Button(string.Empty, GUI.skin.FindStyle("ToolbarSeachCancelButton"))) {
+        // hack for old versions of Unity
+        // which do not process the clipboard
+        if (string.IsNullOrEmpty(s)) {
+            Event current = Event.current;
+            if ((current.control && current.keyCode == KeyCode.V) ||
+                (current.shift && current.keyCode == KeyCode.Insert) ||
+                (current.command && current.keyCode == KeyCode.V)) {
+                if (IsRevision(EditorGUIUtility.systemCopyBuffer)) {
+                    s = EditorGUIUtility.systemCopyBuffer;
+                }
+            }
+        }
+        if (GUILayout.Button(string.Empty, GUI.skin.FindStyle("ToolbarSeachCancelButton"))) {
 			s = string.Empty;
 			GUI.FocusControl(null);
 		}
 		GUILayout.EndHorizontal();
 		if (s != filterString) {
-			SortList(s);
-		}
+            if (IsRevision(s)) {
+                filterString = s;
+                DownloadHtml(s);
+            } else {
+                SortList(s);
+            }
+        }
 	}
+
+    static bool IsRevision(string revision) {
+        return (revision.Length == 10 || revision.Length == 12) && !revision.Contains(".");
+    }
 
 	static void FillMenu(WWW history) {
 		fullList = new SortedList<string, string>();
@@ -537,9 +559,7 @@ public class HelpLastRelease : EditorWindow {
 						text,
 						Mathf.RoundToInt(www.progress * 100f),
 						www.bytesDownloaded / 1024) :
-					string.Format("{0} ({1}%) {2} kB",
-						www.error,
-						Mathf.RoundToInt(www.progress * 100f))
+					string.Format("{0}", www.error)
 			);
 		}
 	}
@@ -557,6 +577,8 @@ public class HelpLastRelease : EditorWindow {
     static void ClearGUI() {
         currentList = null;
         idxSelectedInCurrent = -1;
+        selectedVersion = string.Empty;
+        selectedRevision = string.Empty;
         filterString = string.Empty;
     }
 
@@ -588,7 +610,7 @@ public class HelpLastRelease : EditorWindow {
 		idxOS = Application.platform == RuntimePlatform.WindowsEditor ? 0 : 1;
 		window.Repaint();
 		if (!string.IsNullOrEmpty(selectedRevision)) {
-            if (!officialShow) {
+            if (!officialShow || IsRevision(filterString)) {
                 DownloadIniWin(selectedRevision, selectedVersion);
                 DownloadIniOSX(selectedRevision, selectedVersion);
                 DownloadIniLinux(selectedRevision, selectedVersion);
@@ -621,6 +643,7 @@ public class HelpLastRelease : EditorWindow {
 		hasReleaseNotes = false;
 		idxSelectedInCurrent = historyNum;
 		repeatRN = 0;
+        if (IsRevision(filterString)) filterString = string.Empty;
 		selectedVersion = currentList.Values[idxSelectedInCurrent].Split(' ')[0];
 		DownloadReleaseNotes(VersionToReleaseNotesUrl(selectedVersion));
         if (officialShow) {
@@ -637,6 +660,16 @@ public class HelpLastRelease : EditorWindow {
                 EditorApplication.update += WaitList;
             }
         }
+    }
+
+    static void DownloadInfo(string revision, string version, Action callback) {
+        hasTorrent = false;
+        hasReleaseNotes = false;
+        repeatRN = 0;
+        selectedVersion = version;
+        DownloadReleaseNotes(VersionToReleaseNotesUrl(selectedVersion));
+        selectedRevision = revision;
+        if (callback != null) callback();
     }
 
 	static string VersionToReleaseNotesUrl(string version, int repeat = 0) {
@@ -766,6 +799,13 @@ public class HelpLastRelease : EditorWindow {
         EditorApplication.update += WaitJsonLinux;
     }
 
+    static void DownloadHtml(string revision) {
+        filterString = revision;
+        string url = string.Format(htmlUrl, revision);
+        wwwHtml = new WWW(url);
+        EditorApplication.update += WaitHtml;
+    }
+
 	#endregion
 
 	#region Wait
@@ -824,6 +864,10 @@ public class HelpLastRelease : EditorWindow {
 
     static void WaitJsonLinux() {
         Wait(wwwJsonLinux, WaitJsonLinux, ParseJsonLinux);
+    }
+
+    static void WaitHtml() {
+        Wait(wwwHtml, WaitHtml, ParseHtml);
     }
 
 	static void Wait(WWW www, EditorApplication.CallbackFunction caller, Action<WWW> action) {
@@ -1094,6 +1138,21 @@ public class HelpLastRelease : EditorWindow {
 
     static void ParseJson(WWW jsonWWW, out JsonOS jsonOS) {
         jsonOS = JsonUtility.FromJson<JsonOS>(jsonWWW.text);
+    }
+
+    static void ParseHtml(WWW html) {
+        string[] strings = html.text.Split('\n');
+        for (int i = 0; i < strings.Length; i++) {
+            if (strings[i].Contains("<title>") || strings[i].Contains("<h2>") || strings[i].Contains("<h3>")) {
+                string[] parts = strings[i].TrimStart(' ').Split(' ');
+                if (parts.Length > 1) {
+                    selectedRevision = filterString;
+                    selectedVersion = parts[1];
+                    DownloadInfo(selectedRevision, selectedVersion, UpdateInfo);
+                    break;
+                }
+            }
+        }
     }
 
 	#endregion
