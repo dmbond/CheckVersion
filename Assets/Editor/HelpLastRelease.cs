@@ -147,22 +147,14 @@ public class HelpLastRelease : EditorWindow {
     const string copiedNotif = "URL copied to the clipboard";
 
     static readonly Dictionary<string, Color> colors = new Dictionary<string, Color>() {
-        { "2017.1.", new Color(0f, 0.5f, 1f, 1f) },
-        { "2017.2.", new Color(1f, 0.5f, 1f, 1f) },
-        { "2017.3.", new Color(1f, 0f, 1f, 1f) },
-        { "2017.4.", new Color(0f, 1f, 0f, 1f) },
-        { "2018.1.", new Color(0.5f, 1f, 0.5f, 1f) },
-        { "2018.2.", new Color(0f, 1f, 1f, 1f) },
-        { "2018.3.", new Color(1f, 1f, 0f, 1f) },
-        { "2018.4.", new Color(0f, 1f, 0f, 1f) },
-        { "2019.1.", new Color(0f, 1f, 0.5f, 1f) },
-        { "2019.2.", new Color(1f, 0f, 1f, 1f) },
-        { "2019.3.", new Color(1f, 0f, 0f, 1f) },
+        { "2017.4.", new Color(0f, 1f, 1f, 1f) },
+        { "2018.4.", new Color(0.5f, 1f, 0.5f, 1f) },
+        { "2019.2.", new Color(0f, 1f, 0.5f, 1f) },
+        { "2019.3.", new Color(1f, 1f, 0f, 1f) },
         { "2019.4.", new Color(0f, 1f, 0f, 1f) },
-        { "2020.1.", new Color(1f, 0f, 0f, 1f) },
+        { "2020.1.", new Color(1f, 0.4f, 0.4f, 1f) },
         { "2020.2.", new Color(1f, 0f, 0f, 1f) },
-        { "2020.3.", new Color(1f, 0f, 0f, 1f) },
-        { "2020.4.", new Color(0f, 1f, 0f, 1f) }
+        { "2020.3.", new Color(0f, 1f, 0f, 1f) },
     };
     static Color oldColor = Color.white;
     static Color currentColor = Color.black;
@@ -555,19 +547,6 @@ public class HelpLastRelease : EditorWindow {
             currentList = sortedList;
         } else currentList = tempList;
         filterString = filter;
-    }
-
-    static void ProgressGUI(WWW www, string text) {
-        if (www != null && !www.isDone && string.IsNullOrEmpty(www.error)) {
-            EditorGUI.ProgressBar(EditorGUILayout.GetControlRect(), www.progress,
-                string.IsNullOrEmpty(www.error) ?
-                    string.Format("{0} ({1}%) {2} kB",
-                        text,
-                        Mathf.RoundToInt(www.progress * 100f),
-                        www.bytesDownloaded / 1024) :
-                    string.Format("{0}", www.error)
-            );
-        }
     }
 
     void WaitGUI() {
@@ -1072,6 +1051,7 @@ public class HelpLastRelease : EditorWindow {
 
     static void ParseGithub(WWW github) {
         release = JsonUtility.FromJson<GithubRelease>(github.text);
+        if (string.IsNullOrEmpty(release.created_at)) return;
         string current = EditorPrefs.GetString(prefs + Application.productName, nullDT);
         if (DateTime.ParseExact(release.created_at, universalDT, CultureInfo.InvariantCulture) > 
             DateTime.ParseExact(current, universalDT, CultureInfo.InvariantCulture)) {
