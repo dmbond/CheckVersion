@@ -52,6 +52,28 @@ public class HelpLastRelease : EditorWindow {
 
     const string githubUrl = @"http://api.github.com/repos/dmbond/CheckVersion/releases/latest";
 
+    const string unityHubUrl = @"unityhub://{0}/{1}";
+
+    Dictionary<string, string> unlisted = new Dictionary<string, string>() {
+        { "Android Symbol Files", "AndroidSymbolFiles.zip" },
+        { "Cache Server", "CacheServer-{0}.zip" },
+        { "Mono Develop Win", "MonoDevelop-{0}.zip" },
+        { "Mono Develop OSX", "MonoDevelop.app.tar-{0}.gz" },
+        { "Unity Remote Android", "UnityRemote-Android-{0}.apk" },
+        { "Unity Remote iOS", "UnityRemote-iOS-{0}.zip" },
+        { "Unity Remote Project", "UnityRemoteProject-{0}.zip" },
+        { "Zipped For TeamCity", "ZippedForTeamCity.tar.gz" },
+        { "Build Info", "buildInfo" },
+        { "Builtin Shaders", "builtin_shaders-{0}.zip" },
+        { "Misc PDB Internal", "misc-pdb-internal.zip" },
+        { "Win INI", "unity-{0}-win.ini" },
+        { "OSX INI", "unity-{0}-osx.ini" },
+        { "Linux INI", "unity-{0}-linux.ini" },
+        { "Mac Documentation Installer", "MacDocumentationInstaller/Documentation-{0}.pkg" },
+        { "Windows Documentation Installer", "WindowsDocumentationInstaller/UnityDocumentationSetup-{0}.exe" },
+        { "Nintendo Switch Support", "switch/UnitySetup-Nintendo-Switch-Support-for-Editor-{0}.exe" }
+    };
+
     #endregion
 
     #region Vars
@@ -144,6 +166,7 @@ public class HelpLastRelease : EditorWindow {
     const string infoTooltip = "Show more info";
     const string updateTooltip = "Update from Github";
     const string editorTooltip = "Unity Editor for building your games";
+    const string hubTooltip = "Open in Unity Hub";
     const string copiedNotif = "URL copied to the clipboard";
 
     static readonly Dictionary<string, Color> colors = new Dictionary<string, Color>() {
@@ -161,7 +184,7 @@ public class HelpLastRelease : EditorWindow {
     static float alphaBackForPersonal = 0.3f;
     static Color alpha = new Color(1f, 1f, 1f, alphaBackForPersonal);
     static int repeatRN = 0;
-
+    
     #endregion
 
     #region Menu
@@ -458,6 +481,21 @@ public class HelpLastRelease : EditorWindow {
                         var url = dict[key]["url"].StartsWith("http")
                             ? dict[key]["url"]
                             : string.Format(releaseUrlBeta, selectedRevision, dict[key]["url"]);
+                        EditorGUIUtility.systemCopyBuffer = url;
+                        ShowNotification(new GUIContent(copiedNotif));
+                    }
+                }
+                GUILayout.Space(5f);
+                if (GUILayout.Button(
+                    new GUIContent(hubTooltip, hubTooltip), btnStyle)) {
+                    var url = string.Format(unityHubUrl, selectedVersion, selectedRevision);
+                    Application.OpenURL(url);
+                }
+                GUILayout.Space(5f);
+                foreach (var key in unlisted.Keys) {
+                    if (GUILayout.Button(
+                        new GUIContent(key, key), btnStyle)) {
+                        var url = string.Format(releaseUrlBeta, selectedRevision, string.Format(unlisted[key], selectedVersion, selectedRevision));
                         EditorGUIUtility.systemCopyBuffer = url;
                         ShowNotification(new GUIContent(copiedNotif));
                     }
@@ -956,6 +994,7 @@ public class HelpLastRelease : EditorWindow {
                 section = line.Substring(1, line.Length - 2);
                 dict = new Dictionary<string, string>();
             } else {
+                if (dict == null) continue;
                 var parts = line.Split('=');
                 if (parts.Length > 1) {
                     dict.Add(parts[0].Trim(), parts[1].Trim());
