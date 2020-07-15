@@ -1,7 +1,7 @@
 # CheckVersion
 Checks for Unity updates
 
-![Screenshot](https://user-images.githubusercontent.com/15363149/66247436-2742b480-e725-11e9-803d-7cc57c21397d.png "Screenshot")
+![Screenshot](https://user-images.githubusercontent.com/15363149/87573688-f8a33280-c6d5-11ea-84d3-34a231c2a3ea.png "Screenshot")
 
 ###### Help > Links > Releases...
 - The top search box filters the list (it can also be used to insert a revision number and display information about it)
@@ -11,6 +11,7 @@ Checks for Unity updates
 
 Right (Info) panel
 - Button with version and revision number opens the download page
+- **Open in Hub** launch installation via Unity Hub
 - **Release Notes** opens the corresponding page
 - **Torrent** downloads and launch a torrent file
 - **Win**, **OSX**, **Linux** toggle the bottom list of components to download
@@ -19,10 +20,12 @@ Right (Info) panel
 ###### Help > Links > Check for Updates...
 Show (filter) builds for current branch. The current version is highlighted.
 
-![Screenshot](https://user-images.githubusercontent.com/15363149/66247463-86a0c480-e725-11e9-9b96-9fd78a928dbf.png "Screenshot")
+![Screenshot](https://user-images.githubusercontent.com/15363149/87574186-b3333500-c6d6-11ea-912f-5a7fb252a01a.png "Screenshot")
 
 ###### Help > Links > Official...
 Show builds from the official channel (as Unity Hub)
+
+![Screenshot](https://user-images.githubusercontent.com/15363149/87573978-5df72380-c6d6-11ea-871b-18ddc3b25cab.png "Screenshot")
 
 ###### Help > Links > Search...
 Open Unity Site Search (slow) http://unity3d.com/search
